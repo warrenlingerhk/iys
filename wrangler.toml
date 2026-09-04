@@ -12,7 +12,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "iys-db"
-database_id = "YOUR_D1_DATABASE_ID_HERE"
+database_id = "183d0310-04cb-42c8-9040-c031cf68297a"
 
 [vars]
 GOOGLE_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_PROGRESS_WEBHOOK_ID/exec"
