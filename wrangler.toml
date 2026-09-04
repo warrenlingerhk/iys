@@ -1,0 +1,20 @@
+
+
+# Influence Your Success worker config
+name = "iys"
+compatibility_date = "2026-01-01"
+main = "worker.js"
+
+[assets]
+directory = "./"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "iys-db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
+
+[vars]
+GOOGLE_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_PROGRESS_WEBHOOK_ID/exec"
+SCHOLARSHIP_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_SCHOLARSHIP_WEBHOOK_ID/exec"
+MONEYBACK_WEBHOOK_URL = "https://script.google.com/macros/s/YOUR_MONEYBACK_WEBHOOK_ID/exec"
