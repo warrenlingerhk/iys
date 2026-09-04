@@ -1,0 +1,599 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/svg+xml" href="/logo.svg" />
+<link rel="shortcut icon" href="/logo.svg" />
+<link rel="apple-touch-icon" sizes="180x180" href="/logo.svg" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Influence Your Success — Life Coach Training</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{ --pink:#E600FF; --blue:#00B4D8; --lightBlue:#90E0EF; --darkBlue:#0077B6; --navy:#023E8A; --cream:#F8F9FA; --slate:#6C757D; --white:#FFFFFF; }
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{background:var(--cream);color:var(--navy);font-family:'Nunito Sans',sans-serif;margin:0; font-size:16px}
+h1,h2,h3,.brand,.stat strong{font-family:'Poppins',sans-serif}
+.hidden{display:none!important} .wrap{width:min(1150px,94%);margin-inline:auto}
+.site-head{position:sticky;top:0;z-index:50;background:var(--cream);border-bottom:none}
+.head-in{display:flex;justify-content:space-between;align-items:center;padding:12px 0;gap:12px;border-bottom:3px solid var(--navy)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.25rem;color:var(--navy);text-decoration:none}
+.brand-logo{width:46px;height:46px;object-fit:contain} .brand-dot{color:var(--pink)}
+.head-actions{display:flex;align-items:center;gap:10px}
+.btn{border-radius:999px;font-weight:800;cursor:pointer;transition:transform .15s,box-shadow .15s;font-family:'Nunito Sans'}
+.btn:hover{transform:translateY(-2px)} .btn.small{padding:6px 16px;font-size:.85rem}
+.btn.ghost{background:transparent;border:2px solid var(--navy);color:var(--navy)}
+.btn.cta{background:var(--pink);border:2px solid var(--pink);color:#fff;box-shadow:0 4px 0 rgba(2,62,138,.25)}
+.btn.cta:hover{background:#C700E0;border-color:#C700E0}
+.name-chip{background:#fff;border:2px solid var(--navy);border-radius:999px;padding:6px 16px;font-size:.85rem;font-weight:800;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-badge{background:var(--pink);color:#fff;border-radius:999px;padding:2px 8px;font-size:.75rem;margin-left:6px;display:inline-block}
+.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:28px;padding:26px 0 70px;align-items:start}
+.card{background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(2,62,138,.10)}
+.hero{overflow:hidden;display:grid;grid-template-columns:1.2fr .8fr}
+.hero-media{background:linear-gradient(135deg, var(--blue) 0%, var(--pink) 100%); width:100%; height:100%;}
+.hero-copy{padding:34px 30px 28px}
+.hero h1{font-size:clamp(1.5rem,3.8vw,2.3rem);font-weight:800;line-height:1.2;margin:0}
+.hl-pink{color:var(--pink)}
+.hero-bullets{list-style:none;padding:0;margin:16px 0 0}
+.hero-bullets li{font-size:1.1rem;font-weight:700;color:var(--slate);margin-bottom:8px;padding-left:24px;position:relative}
+.hero-bullets li::before{content:'•';color:var(--pink);font-weight:800;position:absolute;left:0}
+.rail-title{font-size:1.25rem;font-weight:800;margin:6px 0 14px;text-align:center}
+.course-list{display:flex;flex-direction:column;gap:14px}
+.course{border-radius:16px;padding:18px 20px;box-shadow:0 6px 0 rgba(2,62,138,.18);color:#fff}
+.course h3{margin:0;font-size:1.2rem;font-weight:800}
+.course-btn{width:100%;padding:10px;border-radius:999px;border:none;background:var(--navy);color:#fff;font-weight:800;cursor:pointer;font-size:1rem;margin:10px 0}
+.course-btn:hover{background:#012a5c}
+.course-outcomes{margin-top:8px}
+.outcomes-list{margin:8px 0 0;padding-left:18px;list-style:disc;font-size:1rem;font-weight:700}
+.outcomes-extra{margin:0;padding-left:18px;list-style:disc;font-size:1rem;font-weight:700}
+.outcomes-extra li{animation:fadeSlide .3s ease}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.expand-btn{background:none;border:none;cursor:pointer;color:inherit;padding:6px 10px;margin-left:-6px;display:flex;align-items:center;gap:4px;font-weight:800;font-size:.9rem}
+.expand-btn:hover{opacity:.8} .expand-btn svg{transition:transform .3s ease} .expand-btn.expanded svg{transform:rotate(180deg)}
+.content-link{color:var(--pink);font-weight:800;text-decoration:underline}
+.c1{background:var(--blue);color:#fff} .c2{background:var(--lightBlue);color:var(--navy)} .c3{background:var(--pink);color:#fff} .c4{background:var(--darkBlue);color:#fff} .c5{background:var(--navy);color:#fff}
+.auth-wrap{min-height:80vh;display:grid;place-items:center;padding:50px 0}
+.auth-card{width:min(440px,94%);overflow:hidden}
+.auth-band{background:linear-gradient(90deg,var(--blue),var(--pink));padding:18px 26px;font-weight:800;font-size:1.2rem}
+.auth-body{padding:24px 26px}
+.auth-body input{width:100%;padding:11px 14px;border-radius:10px;border:2px solid var(--slate);font:inherit;margin:6px 0 14px; font-size:1rem}
+.auth-body input:focus{outline:none;border-color:var(--pink)}
+.auth-body .btn{width:100%;padding:11px;margin-bottom:10px}
+.form-error{color:var(--pink);font-weight:800;font-size:1rem; margin-top:8px}
+.auth-link{color:var(--pink);font-weight:800;text-decoration:none} .auth-link:hover{text-decoration:underline}
+.module-menu{position:sticky; top:63px; z-index:40; background:var(--navy); color:#fff; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:12px 20px; border-bottom:3px solid var(--pink); width:min(1150px,94%); margin-inline:auto;}
+.module-links{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center}
+.module-menu .back-home{justify-self:start}
+.module-menu .save-status{justify-self:end; margin-left:0}
+.module-menu a{color:#fff; text-decoration:none; font-weight:800; font-size:.95rem; padding:6px 14px; border-radius:999px; transition:background .2s;}
+.module-menu a:hover{background:rgba(255,255,255,.15)}
+.back-home{color:#fff; text-decoration:none; font-weight:800; font-size:1rem; padding:6px 14px} .back-home:hover{opacity:.85}
+.save-status{color:var(--lightBlue); font-weight:800; font-size:1rem; margin-left:12px} .save-warn{color:var(--pink)} .save-err{color:#dc3545}
+.module-section{padding:60px 0; border-bottom:4px solid var(--navy)}
+.bg-mod-1{background:var(--blue); color:#fff} .bg-mod-2{background:var(--lightBlue); color:var(--navy)} .bg-mod-3{background:var(--pink); color:#fff}
+.bg-mod-4{background:var(--navy); color:#fff} .bg-mod-5{background:var(--darkBlue); color:#fff} .bg-mod-6{background:var(--cream); color:var(--navy); border:2px solid var(--navy)}
+.module-header{text-align:center; margin-bottom:40px} .module-header h2{font-size:clamp(2rem,5vw,3rem); font-weight:800; margin:0 0 12px} .module-header p{font-size:1.2rem; font-weight:700; opacity:.95; max-width:700px; margin:0 auto}
+.mod-item{background:#fff; color:var(--navy); border-radius:14px; padding:24px 26px; box-shadow:0 5px 0 rgba(2,62,138,.12); margin-bottom:20px; }
+.mod-item.completed{border-left:5px solid var(--pink)}
+.item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
+.mod-content{font-size:1.05rem;line-height:1.7}
+.mod-content ul{margin:10px 0 0 20px; list-style: disc}
+.mod-content li{margin-bottom:6px}
+.mod-content img{max-width:100%; border-radius:8px; margin:12px 0}
+.mod-content .text-box{background:var(--cream); padding:16px; border-radius:8px; border-left:4px solid var(--blue); margin:12px 0}
+.expandable-box{border:2px solid var(--lightBlue); border-radius:10px; margin:12px 0; overflow:hidden}
+.expandable-header{background:var(--lightBlue); color:var(--navy); padding:14px 18px; font-weight:800; cursor:pointer; display:flex; justify-content:space-between; align-items:center}
+.expandable-header:hover{background:var(--blue); color:#fff}
+.expandable-content{padding:0 18px; max-height:0; overflow:hidden; transition:max-height .3s ease}
+.expandable-content.expanded{max-height:2000px; padding:18px}
+.answer-box{margin-top:16px; background:var(--cream); padding:18px; border-radius:10px; border:2px solid var(--blue)}
+.answer-box label{display:block; font-weight:800; margin-bottom:8px; color:var(--navy)}
+.answer-input{width:100%; padding:12px 14px; border-radius:8px; border:2px solid var(--slate); font:inherit; font-size:1rem; min-height:100px; resize:vertical}
+.answer-input:focus{outline:none; border-color:var(--pink)}
+.module-complete-check{display:flex; align-items:center; gap:12px; margin-top:20px; padding-top:20px; border-top:2px dashed var(--lightBlue)}
+.module-check{width:28px; height:28px; accent-color:var(--pink); cursor:pointer}
+.module-check-label{font-weight:800; font-size:1.1rem; color:var(--navy)}
+.note-input{width:100%;margin-top:14px;padding:14px 16px;border-radius:10px;border:2px solid var(--slate);font:inherit;min-height:90px; font-size:1rem} .note-input:focus{outline:none;border-color:var(--pink)}
+.modal-overlay{position:fixed;inset:0;background:rgba(2,62,138,.6);z-index:100;display:grid;place-items:center;padding:20px}
+.modal-box{background:#fff;border-radius:18px;padding:32px;max-width:420px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)} .modal-box h3{margin:0 0 12px;font-size:1.4rem} .modal-box p{margin:0 0 20px;color:var(--slate);font-weight:700} .modal-close{padding:10px 28px;border-radius:999px;border:none;background:var(--navy);color:#fff;font-weight:800;cursor:pointer}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .layout > div{display:contents}
+  .hero{order:1}
+  .rail{order:2}
+}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.hero-media{min-height:180px}}
+@media(max-width:700px){.module-menu{top:63px; padding:8px 12px; grid-template-columns:1fr; justify-items:center; row-gap:6px} .module-menu a{font-size:.85rem; padding:5px 10px} .module-menu .back-home{justify-self:center} .save-status{display:none}}
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <div class="head-in wrap">
+    <a class="brand" href="#" onclick="showHome();return false;">
+      <img class="brand-logo" src="/logo.svg" alt="" onerror="this.remove()">
+      <span>Influence Your <span class="brand-dot">Success</span></span>
+    </a>
+    <div class="head-actions" id="head-actions"></div>
+  </div>
+</header>
+
+<div id="view-home">
+  <div class="wrap layout">
+    <div>
+      <section class="hero card">
+        <div class="hero-copy">
+          <h1>Transform Your Life<br><span class="hl-pink">Become a Coach</span></h1>
+          <ul class="hero-bullets">
+            <li>Master coaching fundamentals.</li>
+            <li>Build lasting relationships.</li>
+            <li>Create meaningful impact.</li>
+          </ul>
+        </div>
+        <div class="hero-media"></div>
+      </section>
+    </div>
+
+    <aside class="rail" id="rail-home">
+      <h2 class="rail-title">Lessons</h2>
+      <div class="course-list" id="course-list-home"></div>
+    </aside>
+  </div>
+</div>
+
+<div id="view-auth-signup" class="hidden">
+  <div class="auth-wrap">
+    <div class="auth-card card">
+      <div class="auth-band">Join IYS</div>
+      <div class="auth-body">
+        <input type="text" id="signup-name" placeholder="Your name" autocomplete="name" required>
+        <input type="email" id="signup-email" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="signup-password" placeholder="Password (6+ characters)" autocomplete="new-password" required>
+        <button class="btn cta" onclick="signup()">Create Account</button>
+        <p style="margin:12px 0 0; text-align:center; font-size:.95rem">Already have an account? <a href="#" class="auth-link" onclick="showAuth('login');return false">Log in</a></p>
+        <p class="form-error" id="signup-error"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-auth-login" class="hidden">
+  <div class="auth-wrap">
+    <div class="auth-card card">
+      <div class="auth-band">Welcome Back</div>
+      <div class="auth-body">
+        <input type="email" id="login-email" placeholder="Email" autocomplete="email" required>
+        <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required>
+        <button class="btn cta" onclick="login()">Log In</button>
+        <p style="margin:12px 0 0; text-align:center; font-size:.95rem">New here? <a href="#" class="auth-link" onclick="showAuth('signup');return false">Create an account</a></p>
+        <p class="form-error" id="login-error"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-course" class="hidden">
+  <nav class="module-menu">
+    <a href="#" class="back-home" onclick="showHome();return false;">&larr; Back to Home</a>
+    <div class="module-links">
+      <a href="#mod-1">Module 1</a><a href="#mod-2">Module 2</a><a href="#mod-3">Module 3</a>
+      <a href="#mod-4">Module 4</a><a href="#mod-5">Module 5</a><a href="#mod-6">Module 6</a>
+    </div>
+    <span id="save-status" class="save-status">All changes saved.</span>
+  </nav>
+  <div id="course-content"></div>
+</div>
+
+<div id="access-modal" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-box">
+    <h3>Lesson Access Required</h3>
+    <p>Contact the IYS team to get access to this lesson.</p>
+    <button class="modal-close" onclick="document.getElementById('access-modal').classList.add('hidden')">Got it</button>
+  </div>
+</div>
+
+<footer style="background:var(--navy); color:#fff; padding:40px 0 20px; margin-top:60px; text-align:center;">
+  <div class="wrap">
+    <p style="margin:0 0 20px; font-size:.9rem; opacity:.8;">©2026 Influence Your Success. All rights reserved.</p>
+  </div>
+</footer>
+
+<script>
+const API_URL = '';
+// --- GOOGLE SHEETS CMS LINKS (READ-ONLY) ---
+const CMS_LESSONS_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_LESSONS_SHEET_ID/pub?gid=0&single=true&output=csv';
+const CMS_CONTENT_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_CONTENT_SHEET_ID/pub?gid=0&single=true&output=csv';
+const CMS_ANSWERS_WEBHOOK = 'https://script.google.com/macros/s/YOUR_ANSWERS_WEBHOOK_ID/exec';
+// --------------------------------------------
+
+let saveTimeout;
+let LESSONS = []; 
+let COURSE_DATA = []; 
+
+function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
+function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
+function showAuth(type) { hideAllViews(); document.getElementById(type === 'signup' ? 'view-auth-signup' : 'view-auth-login').classList.remove('hidden'); window.scrollTo(0,0); }
+function showCourse(){ 
+  hideAllViews(); 
+  document.getElementById('view-course').classList.remove('hidden'); 
+  const head = document.querySelector('.site-head');
+  const menu = document.querySelector('.module-menu');
+  if (head && menu) menu.style.top = head.offsetHeight + 'px';
+  renderCourse(); 
+  history.pushState(null, '', '#course'); 
+  window.scrollTo(0,0); 
+}
+function logout(){ localStorage.clear(); showHome(); }
+
+function renderHeader(){
+  const host = document.getElementById('head-actions');
+  const name = localStorage.getItem('iys_name');
+  if (localStorage.getItem('token')) {
+    const isAdmin = localStorage.getItem('iys_is_admin') === '1';
+    host.innerHTML = (isAdmin ? '<a href="/admin.html" class="btn small ghost" style="text-decoration:none;background:#fff">Admin<span id="admin-badge" class="admin-badge hidden"></span></a>' : '') +
+      '<span class="name-chip" title="' + (name||'') + '">' + (name || 'Classmate') + '</span>' +
+      '<button class="btn small ghost" onclick="logout()" style="background:#fff">Log out</button>';
+  } else {
+    host.innerHTML = '<button class="btn small cta" onclick="showAuth(\'signup\')">Sign Up</button>' +
+      '<button class="btn small ghost" onclick="showAuth(\'login\')">Log in</button>';
+  }
+}
+
+function renderLessons(){
+  const host = document.getElementById('course-list-home');
+  if (!host || LESSONS.length === 0) return;
+  host.innerHTML = LESSONS.map(l => {
+    return '<div class="course c' + l.tone + '">' +
+      '<h3>' + l.name + '</h3>' +
+      '<button class="course-btn" style="margin:10px 0" onclick="handleLessonClick(\'' + l.name + '\', ' + l.active + ')">Enter ' + l.name + '</button>' +
+      '<div class="course-outcomes">' +
+        '<ul class="outcomes-list">' + l.outcomes.slice(0, 2).map(o => '<li>' + o + '</li>').join('') + '</ul>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function handleLessonClick(name, active){
+  if (!localStorage.getItem('token')) { showAuth('login'); return; }
+  const isAdmin = localStorage.getItem('iys_is_admin') === '1';
+  let hasAccess = isAdmin;
+  if (!hasAccess) {
+    try {
+      const res = await fetch('/api/my-offers', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
+      if (res.ok) hasAccess = (await res.json()).includes(name);
+    } catch (e) {}
+  }
+  if (active && hasAccess) { showCourse(); return; }
+  alert('Contact the IYS team to get access to ' + name + '.');
+}
+function closeModal(e){ if (e.target.id === 'access-modal') e.target.classList.add('hidden'); }
+
+async function login() {
+  const errEl = document.getElementById('login-error'); errEl.innerText = '';
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  try {
+    const res = await fetch(API_URL + '/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('iys_is_paid', data.is_paid);
+      localStorage.setItem('iys_is_admin', data.is_admin);
+      localStorage.setItem('iys_name', data.name || email.split('@')[0]);
+      localStorage.setItem('iys_email', email.toLowerCase());
+      showHome();
+    } else { errEl.innerText = data.error || 'Something went wrong.'; }
+  } catch (e) { errEl.innerText = 'Network error — try again.'; }
+}
+
+async function signup() {
+  const errEl = document.getElementById('signup-error'); errEl.innerText = '';
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!name) { errEl.innerText = 'Please enter your name.'; return; }
+  try {
+    const res = await fetch(API_URL + '/api/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, password }) });
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('iys_is_paid', data.is_paid);
+      localStorage.setItem('iys_is_admin', data.is_admin);
+      localStorage.setItem('iys_name', name);
+      localStorage.setItem('iys_email', email.toLowerCase());
+      showHome();
+    } else { errEl.innerText = data.error || 'Something went wrong.'; }
+  } catch (e) { errEl.innerText = 'Network error — try again.'; }
+}
+
+function linkify(text){
+  let esc = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  esc = esc.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="content-link">$1</a>');
+  esc = esc.replace(/(^|[^"'>])(https?:\/\/[^\s|]+|www\.[^\s|]+)/g, function(m, pre, url){
+    const href = url.indexOf('www') === 0 ? 'https://' + url : url;
+    return pre + '<a href="' + href + '" target="_blank" rel="noopener" class="content-link">' + url + '</a>';
+  });
+  return esc;
+}
+
+function renderCourse(){
+  const host = document.getElementById('course-content'); host.innerHTML = '';
+  if (COURSE_DATA.length === 0) return;
+  
+  COURSE_DATA.forEach(mod => {
+    const section = document.createElement('section'); section.id = mod.id; section.className = 'module-section ' + mod.bg;
+    section.innerHTML = '<div class="wrap"><div class="module-header"><h2>' + mod.title + '</h2><p>' + mod.sub + '</p></div><div class="mod-items" id="items-' + mod.id + '"></div></div>';
+    host.appendChild(section);
+    const itemsHost = document.getElementById('items-' + mod.id);
+    
+    mod.items.forEach(item => {
+      const div = document.createElement('div'); 
+      div.className = 'mod-item'; 
+      div.dataset.id = item.id; 
+      div.dataset.moduleId = mod.id;
+      
+      let contentHtml = '';
+      
+      // Handle different content types
+      if (item.type === 'expandable') {
+        contentHtml = `
+          <div class="expandable-box">
+            <div class="expandable-header" onclick="toggleExpandable(this)">
+              <span>${item.title}</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="expandable-content">
+              <div class="mod-content">${linkify(item.content)}</div>
+            </div>
+          </div>
+        `;
+      } else if (item.type === 'answer') {
+        contentHtml = `
+          <h3 class="item-title">${item.title}</h3>
+          <div class="mod-content">${linkify(item.instruction || '')}</div>
+          <div class="answer-box">
+            <label for="answer-${item.id}">${item.question}</label>
+            <textarea class="answer-input" id="answer-${item.id}" data-answer-id="${item.id}" placeholder="Type your answer here..." oninput="triggerAutoSave()">${item.savedAnswer || ''}</textarea>
+          </div>
+        `;
+      } else if (item.type === 'image') {
+        contentHtml = `
+          <h3 class="item-title">${item.title}</h3>
+          <div class="mod-content">
+            <img src="${item.imageUrl}" alt="${item.alt || ''}">
+            ${item.caption ? `<p style="text-align:center; font-style:italic; color:var(--slate)">${item.caption}</p>` : ''}
+          </div>
+        `;
+      } else if (item.type === 'text-box') {
+        contentHtml = `
+          <h3 class="item-title">${item.title}</h3>
+          <div class="text-box">${linkify(item.content)}</div>
+        `;
+      } else {
+        contentHtml = `
+          <h3 class="item-title">${item.title}</h3>
+          <div class="mod-content">${linkify(item.content)}</div>
+        `;
+      }
+      
+      div.innerHTML = contentHtml;
+      itemsHost.appendChild(div);
+    });
+    
+    // Add module completion checkbox at the end
+    const completeDiv = document.createElement('div');
+    completeDiv.className = 'module-complete-check';
+    completeDiv.innerHTML = `
+      <input type="checkbox" class="module-check" id="complete-${mod.id}" data-module-id="${mod.id}" onchange="triggerAutoSave()">
+      <label class="module-check-label" for="complete-${mod.id}">I have completed Module ${mod.number}</label>
+    `;
+    itemsHost.appendChild(completeDiv);
+  });
+  
+  loadProgress();
+}
+
+function toggleExpandable(header) {
+  const content = header.nextElementSibling;
+  const svg = header.querySelector('svg');
+  content.classList.toggle('expanded');
+  svg.style.transform = content.classList.contains('expanded') ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+function triggerAutoSave(){ 
+  setStatus('Unsaved changes…', 'save-warn'); 
+  clearTimeout(saveTimeout); 
+  saveTimeout = setTimeout(saveProgress, 1500); 
+}
+
+function setStatus(text, cls){ 
+  const el = document.getElementById('save-status'); 
+  el.innerText = text; 
+  el.className = 'save-status ' + (cls || ''); 
+}
+
+async function saveProgress(){
+  setStatus('Saving…', 'save-warn');
+  const progress = [];
+  
+  // Save module completions
+  document.querySelectorAll('.module-check').forEach(check => { 
+    progress.push({ 
+      item_id: 'module-' + check.dataset.moduleId, 
+      completed: check.checked ? 1 : 0,
+      type: 'module_completion'
+    }); 
+  });
+  
+  // Save answers
+  document.querySelectorAll('.answer-input').forEach(input => {
+    progress.push({
+      item_id: input.dataset.answerId,
+      note: input.value,
+      type: 'answer'
+    });
+  });
+
+  try { 
+    const res = await fetch('/api/progress', { 
+      method:'POST', 
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }, 
+      body: JSON.stringify({ progress }) 
+    }); 
+    if (res.ok) { setStatus('All changes saved.', 'save-ok'); } 
+    else { setStatus('Error saving!', 'save-err'); }
+  } catch (e) { 
+    console.error(e);
+    setStatus('Error saving!', 'save-err'); 
+  }
+}
+
+async function loadProgress(){
+  try { 
+    const res = await fetch('/api/progress', { 
+      headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} 
+    }); 
+    if (!res.ok) { setStatus('All changes saved.', 'save-ok'); return; } 
+    const data = await res.json(); 
+    
+    data.forEach(saved => { 
+      // Load module completions
+      if (saved.type === 'module_completion') {
+        const check = document.querySelector(`#complete-${saved.item_id.replace('module-', '')}`);
+        if (check) {
+          check.checked = saved.completed === 1;
+          check.closest('.mod-item').classList.toggle('completed', saved.completed === 1);
+        }
+      }
+      // Load answers
+      if (saved.type === 'answer') {
+        const input = document.querySelector(`#answer-${saved.item_id}`);
+        if (input) input.value = saved.note || '';
+      }
+    }); 
+    setStatus('All changes saved.', 'save-ok'); 
+  } catch (e) { 
+    console.error(e);
+    setStatus('Error loading!', 'save-err'); 
+  }
+}
+
+// --- GOOGLE SHEETS CMS ENGINE ----
+async function parseCSV(text) {
+  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') { inQuotes = !inQuotes; } 
+    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; } 
+    else if ((char === '\n' || char === '\r') && !inQuotes) { if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); } currentRow = []; currentCell = ''; if (char === '\r' && text[i+1] === '\n') i++; } 
+    else { currentCell += char; }
+  }
+  if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
+  return rows;
+}
+
+async function loadLessonsFromSheet() {
+  try {
+    const response = await fetch(CMS_LESSONS_URL);
+    const csvText = await response.text();
+    const rows = await parseCSV(csvText);
+    LESSONS = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length >= 3) {
+        LESSONS.push({
+          name: row[0].trim(),
+          tone: parseInt(row[1].trim()) || 1,
+          active: row[2].trim().toLowerCase() === 'true',
+          outcomes: row[3] ? row[3].split('|').map(o => o.trim()).filter(o => o) : []
+        });
+      }
+    }
+    renderLessons();
+  } catch (error) {
+    console.error('CMS Lesson Load Error:', error);
+  }
+}
+
+async function loadCourseContentFromSheet() {
+  try {
+    const response = await fetch(CMS_CONTENT_URL);
+    const csvText = await response.text();
+    const rows = await parseCSV(csvText);
+    COURSE_DATA = [];
+    let currentMod = null;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length < 4) continue;
+      
+      const modNum = row[0] ? row[0].trim() : '1';
+      const itemType = row[1] ? row[1].trim().toLowerCase() : 'text';
+      const title = row[2] ? row[2].trim() : '';
+      const content = row[3] ? row[3].trim() : '';
+      const extra1 = row[4] ? row[4].trim() : '';
+      const extra2 = row[5] ? row[5].trim() : '';
+
+      if (!title && itemType !== 'module_header') continue;
+
+      if (!currentMod || currentMod.id !== 'mod-' + modNum) {
+        currentMod = {
+          id: 'mod-' + modNum,
+          number: modNum,
+          title: 'Module ' + modNum,
+          bg: 'bg-mod-' + modNum,
+          sub: '',
+          items: []
+        };
+        COURSE_DATA.push(currentMod);
+      }
+
+      const item = {
+        id: title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '') || 'item-' + i,
+        type: itemType,
+        title: title
+      };
+
+      if (itemType === 'expandable') {
+        item.content = content;
+      } else if (itemType === 'answer') {
+        item.question = content;
+        item.instruction = extra1;
+      } else if (itemType === 'image') {
+        item.imageUrl = content;
+        item.alt = extra1;
+        item.caption = extra2;
+      } else if (itemType === 'text-box') {
+        item.content = content;
+      } else {
+        item.content = content;
+      }
+
+      currentMod.items.push(item);
+    }
+    
+    renderCourse();
+  } catch (error) {
+    console.error('CMS Content Load Error:', error);
+  }
+}
+  
+// Initialize
+loadLessonsFromSheet();
+loadCourseContentFromSheet();
+
+// Check URL on load
+if (location.hash.startsWith('#mod') || location.hash === '#course') {
+  showCourse();
+} else {
+  showHome();
+}
+</script>
+</body>
+</html>
