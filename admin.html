@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IYS — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{ --pink:#E600FF; --blue:#00B4D8; --lightBlue:#90E0EF; --darkBlue:#0077B6; --navy:#023E8A; --cream:#F8F9FA; --slate:#6C757D; --red:#dc3545; --green:#28a745; }
+*{box-sizing:border-box}
+body{background:var(--cream);color:var(--navy);font-family:'Nunito Sans',sans-serif;margin:0;font-size:16px}
+h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
+.wrap{width:min(1150px,94%);margin-inline:auto}
+.site-head{position:sticky;top:0;z-index:50;background:var(--cream)}
+.head-in{display:flex;justify-content:space-between;align-items:center;padding:12px 0;gap:12px;border-bottom:3px solid var(--pink)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.25rem;color:var(--navy);text-decoration:none}
+.brand-dot{color:var(--pink)}
+.btn{border-radius:999px;font-weight:800;cursor:pointer;font-family:'Nunito Sans';padding:6px 16px;font-size:.85rem}
+.btn.ghost{background:#fff;border:2px solid var(--navy);color:var(--navy);text-decoration:none;display:inline-block}
+h1{font-size:1.6rem;margin:24px 0 6px}
+h2{font-size:1.2rem;margin:28px 0 12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 5px 0 rgba(2,62,138,.12)}
+.card .num{font-size:1.7rem;font-weight:800;font-family:'Poppins'; color: var(--navy);}
+.card .lbl{font-size:.85rem;font-weight:700;color:var(--slate)}
+.table-wrap{overflow-x:auto;background:#fff;border-radius:14px;box-shadow:0 5px 0 rgba(2,62,138,.12)}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:10px 14px;text-align:left;font-size:.9rem;border-bottom:1px solid rgba(2,62,138,.08);white-space:nowrap}
+th{background:var(--navy);color:#fff;font-weight:800}
+td input[type="checkbox"]{width:18px;height:18px;accent-color:var(--pink);cursor:pointer}
+.report{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 0 rgba(2,62,138,.10)}
+.report .meta{font-size:.85rem;color:var(--slate);font-weight:700;margin-bottom:6px}
+.report .content{margin-bottom:10px;white-space:pre-wrap}
+.report .actions{display:flex;gap:10px;flex-wrap:wrap}
+.report .actions button{border:none;border-radius:999px;padding:6px 14px;font-weight:800;cursor:pointer;font-size:.8rem}
+.resolve{background:var(--blue);color:#fff}
+.resolve:hover{background:var(--darkBlue)}
+.delete{background:var(--red);color:#fff}
+.resolved-tag{color:var(--green);font-weight:800}
+.empty{color:var(--slate);font-weight:700}
+@media(max-width:600px){ h1{font-size:1.3rem} th,td{padding:8px 10px} }
+</style>
+</head>
+<body>
+<header class="site-head">
+  <div class="head-in wrap">
+   <a class="brand" href="/"><span>IYS <span class="brand-dot">Admin</span></span></a>
+    <a class="btn ghost" href="/">← Back to site</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Admin Dashboard</h1>
+  <div class="cards" id="stats"></div>
+  
+  <h2>Pending Approvals</h2>
+  <div id="pending"></div>
+  
+  <h2>Analytics</h2>
+  <div class="cards" id="analytics"></div>
+  
+  <h2>Classmates (Admin + Lesson Access)</h2>
+  <div class="table-wrap">
+    <table id="users-table">
+      <thead></thead>
+      <tbody id="users-body"></tbody>
+    </table>
+  </div>
+  
+  <h2>Reports</h2>
+  <div id="reports"></div>
+</main>
+
+<script>
+const API_URL = '';
+const CMS_LESSONS_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_LESSONS_SHEET_ID/pub?gid=0&single=true&output=csv';
+const token = localStorage.getItem('token');
+
+if (!token || localStorage.getItem('iys_is_admin') !== '1') {
+  window.location.href = '/';
+}
+
+let LESSON_NAMES = [];
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + token });
+  if (opts.body) opts.headers['Content-Type'] = 'application/json';
+  const res = await fetch(API_URL + path, opts);
+  if (res.status === 401 || res.status === 403) { window.location.href = '/'; throw new Error('Not authorized'); }
+  if (!res.ok) {
+    let msg = 'Request failed';
+    try { const d = await res.json(); if (d && d.error) msg = d.error; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function card(num, lbl) {
+  return '<div class="card"><div class="num">' + num + '</div><div class="lbl">' + lbl + '</div></div>';
+}
+
+async function parseCSV(text) {
+  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') { inQuotes = !inQuotes; }
+    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; }
+    else if ((char === '\n' || char === '\r') && !inQuotes) { if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); } currentRow = []; currentCell = ''; if (char === '\r' && text[i+1] === '\n') i++; }
+    else { currentCell += char; }
+  }
+  if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
+  return rows;
+}
+
+async function loadLessonNames() {
+  try {
+    const text = await (await fetch(CMS_LESSONS_URL)).text();
+    const rows = await parseCSV(text);
+    LESSON_NAMES = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] && rows[i][0].trim()) LESSON_NAMES.push(rows[i][0].trim());
+    }
+  } catch (e) { LESSON_NAMES = ['IYS Lesson 1']; }
+}
+
+async function loadStats() {
+  try {
+    const s = await api('/api/admin/stats');
+    document.getElementById('stats').innerHTML =
+      card(s.users, 'Classmates') + card(s.posts, 'Posts') + card(s.reports, 'Reports') + card(s.mod1, 'Module 1 completed');
+  } catch (e) { console.error(e); }
+}
+
+async function loadPending() {
+  try {
+    const list = await api('/api/admin/pending');
+    const host = document.getElementById('pending');
+    if (!list.length) { host.innerHTML = '<p class="empty">No pending applications. 🎉</p>'; return; }
+    host.innerHTML = list.map(u =>
+      '<div class="report">' +
+        '<div class="meta">#' + (u.user_number || '—') + ' ' + u.name + ' — ' + u.email + ' (signed up ' + (u.created_at || '').slice(0, 10) + ')</div>' +
+        '<div class="actions"><button class="resolve" onclick="approveUser(' + u.id + ')">Approve (sold)</button></div>' +
+      '</div>'
+    ).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function approveUser(id) {
+  await api('/api/admin/approve', { method: 'POST', body: JSON.stringify({ user_id: id }) });
+  loadPending(); loadUsers(); loadStats();
+}
+
+async function loadAnalytics() {
+  try {
+    const a = await api('/api/admin/analytics');
+    document.getElementById('analytics').innerHTML =
+      card(a.totalUsers, 'Total classmates') + card(a.activeLearners, 'Active learners') +
+      card(a.eliteRate + '%', 'Completion rate') + card(a.engagement, 'Engagement') + card(a.healthRatio, 'Health ratio');
+  } catch (e) { console.error(e); }
+}
+
+async function loadUsers() {
+  try {
+    const results = await Promise.all([api('/api/admin/users'), api('/api/admin/access')]);
+    const users = results[0];
+    const accessRows = results[1];
+    const access = {};
+    accessRows.forEach(r => { (access[r.user_id] = access[r.user_id] || []).push(r.offer); });
+
+    document.querySelector('#users-table thead').innerHTML =
+      '<tr><th>#</th><th>Name</th><th>Email</th><th>Admin</th><th>Paid</th><th>Joined</th>' +
+      LESSON_NAMES.map(o => '<th>' + o + '</th>').join('') + '</tr>';
+
+    document.getElementById('users-body').innerHTML = users.map(u => {
+      const my = access[u.id] || [];
+      return '<tr><td>' + (u.user_number || '') + '</td><td>' + u.name + '</td><td>' + u.email + '</td>' +
+        '<td><input type="checkbox" ' + (u.is_admin ? 'checked' : '') + ' onchange="setAdmin(' + u.id + ', this.checked)"></td>' +
+        '<td>' + (u.is_paid ? 'Yes' : 'No') + '</td>' +
+        '<td>' + (u.created_at || '').slice(0, 10) + '</td>' +
+        LESSON_NAMES.map(o => '<td><input type="checkbox" ' + (my.indexOf(o) !== -1 ? 'checked' : '') + ' onchange="setAccess(' + u.id + ',\'' + o + '\', this.checked)"></td>').join('') +
+        '</tr>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function setAdmin(id, on) {
+  try {
+    await api('/api/admin/set-admin', { method: 'POST', body: JSON.stringify({ user_id: id, is_admin: on }) });
+  } catch (e) { alert(e.message); }
+  loadUsers();
+}
+
+async function setAccess(id, offer, on) {
+  try {
+    await api('/api/admin/access', { method: 'POST', body: JSON.stringify({ user_id: id, offer: offer, granted: on }) });
+  } catch (e) { alert(e.message); }
+  loadUsers();
+}
+
+async function loadReports() {
+  try {
+    const reports = await api('/api/admin/reports');
+    const host = document.getElementById('reports');
+    if (!reports.length) { host.innerHTML = '<p class="empty">No reports. 🎉</p>'; return; }
+    host.innerHTML = reports.map(r =>
+      '<div class="report">' +
+        '<div class="meta">Reported by ' + (r.reporter_name || 'Unknown') + ' → ' + (r.reported_user_name || 'Deleted user') +
+          ' on ' + (r.created_at || '').slice(0, 10) + (r.resolved ? ' <span class="resolved-tag">• RESOLVED</span>' : '') + '</div>' +
+        '<div class="content">' + (r.post_content || '[post deleted]') + '</div>' +
+        (r.reason ? '<div class="meta">Reason: ' + r.reason + '</div>' : '') +
+        '<div class="actions">' +
+          '<button class="resolve" onclick="resolveReport(' + r.id + ', ' + (r.resolved ? 0 : 1) + ')">' + (r.resolved ? 'Unresolve' : 'Resolve') + '</button>' +
+          '<button class="delete" onclick="deleteReport(' + r.id + ')">Delete report</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function resolveReport(id, resolved) {
+  await api('/api/admin/reports/resolve', { method: 'POST', body: JSON.stringify({ report_id: id, resolved: !!resolved }) });
+  loadReports();
+}
+async function deleteReport(id) {
+  if (!confirm('Delete this report? The post itself stays.')) return;
+  await api('/api/admin/reports/delete', { method: 'POST', body: JSON.stringify({ report_id: id }) });
+  loadReports();
+}
+
+loadLessonNames().then(function(){
+  loadStats();
+  loadPending();
+  loadAnalytics();
+  loadUsers();
+  loadReports();
+});
+</script>
+</body>
+</html>
