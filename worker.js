@@ -3,7 +3,7 @@
 // --- CONFIG ---
 const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
 // PASTE YOUR /exec LINK HERE ONCE YOU HAVE IT
-const AMS_WEBHOOK_URL = 'PASTE_YOUR_EXEC_LINK_HERE'; 
+const AMS_WEBHOOK_URL = 'PASTE_YOUR_EXEC_LINK_HERE';
 
 export default {
   async fetch(request, env, ctx) {
@@ -24,14 +24,13 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/lesson' && method === 'GET') {
     const lessonId = url.searchParams.get('id');
     if (!lessonId) return json({ error: 'Missing Lesson ID' }, 400);
-    
     const sheetUrl = `https://docs.google.com/spreadsheets/d/${CMS_SHEET_ID}/export?format=csv&sheet=${lessonId}`;
     try {
       const res = await fetch(sheetUrl);
       if (!res.ok) return json({ error: 'Lesson not found in sheet' }, 404);
       const csv = await res.text();
       const rows = await parseCSV(csv);
-      return json(rows.slice(1)); // Return rows without header
+      return json(rows.slice(1));
     } catch (e) {
       return json({ error: 'Failed to fetch lesson' }, 500);
     }
@@ -97,29 +96,81 @@ async function handleApi(request, env, ctx, url) {
     if (method === 'POST') {
       const body = await request.json();
       const progress = body.progress || [];
-      const lessonId = body.lesson; // Capture the lesson ID
-      
+      const lessonId = body.lesson;
       for (const item of progress) {
         await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))").bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
       }
-      
-      // Sync to AMS (Google Sheet)
       if (AMS_WEBHOOK_URL && AMS_WEBHOOK_URL !== 'PASTE_YOUR_EXEC_LINK_HERE' && lessonId) {
         const user = await env.DB.prepare('SELECT email, name, member_number FROM users WHERE id = ?').bind(userId).first();
         ctx.waitUntil(fetch(AMS_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            lesson: lessonId,
-            email: user.email,
-            name: user.name,
-            member_number: user.member_number,
-            progress: progress
-          })
+          body: JSON.stringify({ lesson: lessonId, email: user.email, name: user.name, member_number: user.member_number, progress: progress })
         }).catch(e => console.error('AMS Sync failed', e)));
       }
-      
       return json({ success: true });
+    }
+  }
+
+  // --- COMMUNITY ---
+  if (path === '/api/posts' && method === 'GET') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as author_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.banned = 0 ORDER BY p.pinned DESC, p.created_at DESC LIMIT 100`).bind(userId).all();
+    for (let post of posts.results) {
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as author_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.banned = 0 ORDER BY p.created_at ASC`).bind(userId, post.id).all();
+    }
+    return json(posts.results);
+  }
+
+  if (path === '/api/posts' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const { content, parent_id } = await request.json();
+    if (!content || !String(content).trim()) return json({ error: 'Post cannot be empty.' }, 400);
+    const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)').bind(userId, String(content).trim(), parent_id || null).run();
+    return json({ id: res.meta.last_row_id });
+  }
+
+  if (path === '/api/posts/delete' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Admin only.' }, 403);
+    const { post_id } = await request.json();
+    await env.DB.prepare('DELETE FROM posts WHERE id = ? OR parent_id = ?').bind(post_id, post_id).run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/posts/pin' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Admin only.' }, 403);
+    const { post_id } = await request.json();
+    await env.DB.prepare('UPDATE posts SET pinned = NOT pinned WHERE id = ?').bind(post_id).run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/users/ban' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Admin only.' }, 403);
+    const { user_id } = await request.json();
+    await env.DB.prepare('UPDATE users SET banned = 1 WHERE id = ?').bind(user_id).run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/reports' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const { post_id, reason } = await request.json();
+    await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)').bind(post_id, userId, reason || '').run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/likes' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const { post_id } = await request.json();
+    try {
+      await env.DB.prepare('INSERT INTO likes (post_id, user_id) VALUES (?, ?)').bind(post_id, userId).run();
+      return json({ liked: true });
+    } catch (e) {
+      await env.DB.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').bind(post_id, userId).run();
+      return json({ liked: false });
     }
   }
 
@@ -165,7 +216,7 @@ async function handleApi(request, env, ctx, url) {
     if (Number(user_id) === Number(adminId) && !is_admin) return json({ error: 'You cannot remove your own admin status.' }, 400);
     await env.DB.prepare('UPDATE users SET is_admin = ? WHERE id = ?').bind(is_admin ? 1 : 0, user_id).run();
     return json({ success: true });
-  }  
+  }
   if (path === '/api/admin/stats' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
