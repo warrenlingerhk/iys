@@ -1,9 +1,8 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+<link rel="shortcut icon" href="/logo.svg" type="image/svg+xml" />
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Influence Your Success — Life Coach Training</title>
@@ -131,7 +130,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
     <div>
       <section class="hero card">
         <div class="hero-copy">
-          <h1>Advanced Certificate in Life Coaching<br><span class="hl-pink">HKU SPACE</span></h1>
+          <h1>advanced Certificate in Life Coaching<br><span class="hl-pink">HKU SPACE</span></h1>
           <ul class="hero-bullets">
             <li>Master coaching fundamentals.</li>
             <li>Build lasting relationships.</li>
@@ -165,6 +164,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
         <input type="text" id="signup-name" placeholder="Your name" required>
         <input type="email" id="signup-email" placeholder="Email" required>
         <input type="password" id="signup-password" placeholder="Password (8+ characters)" required>
+        <input type="password" id="signup-password-confirm" placeholder="Confirm Password" required>
         <button class="btn cta" onclick="signup()">Create Account</button>
         <p style="margin:12px 0 0; text-align:center; font-size:.95rem">Already have an account? <a href="#" class="auth-link" onclick="showAuth('login');return false">Log in</a></p>
         <p class="form-error" id="signup-error"></p>
@@ -202,6 +202,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
     <h3>Change Password</h3>
     <input type="password" id="cp-current" placeholder="Current Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-new" placeholder="New Password (8+ characters)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
+    <input type="password" id="cp-new-confirm" placeholder="Confirm New Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <p class="form-error" id="cp-error" style="text-align:center"></p>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:15px">
       <button class="btn ghost" onclick="document.getElementById('change-password-modal').classList.add('hidden')">Cancel</button>
@@ -331,11 +332,11 @@ function postHtml(p, isReply){
     <div class="post-head">
       <span class="post-name">${escapeHtml(p.user_name)}</span>
       <span class="post-date">${(p.created_at||'').slice(0,10)}</span>
-      ${p.pinned ? '<span class="pin-tag">📌 Pinned</span>' : ''}
+      ${p.pinned ? '<span class="pin-tag"> Pinned</span>' : ''}
     </div>
     <div class="post-content">${linkify(p.content)}</div>
     <div class="post-actions">
-      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : '🤍'} ${p.like_count}</button>
+      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : ''} ${p.like_count}</button>
       ${!isReply ? `<button class="post-btn" onclick="toggleReplyBox(${p.id})">Reply</button>` : ''}
       <button class="post-btn" onclick="reportPost(${p.id})">Report</button>
       ${isAdmin ? `<button class="post-btn admin" onclick="adminPin(${p.id})">${p.pinned ? 'Unpin' : 'Pin'}</button><button class="post-btn admin" onclick="adminDelete(${p.id})">Delete</button><button class="post-btn admin" onclick="adminBan(${p.author_id})">Ban</button>` : ''}
@@ -413,7 +414,11 @@ async function signup() {
   const name = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
+  const confirmPassword = document.getElementById('signup-password-confirm').value;
+  
   if (!name) { errEl.innerText = 'Please enter your name.'; return; }
+  if (password !== confirmPassword) { errEl.innerText = 'Passwords do not match.'; return; }
+  
   try {
     const res = await fetch(API_URL + '/api/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, password }) });
     const data = await res.json();
@@ -430,12 +435,16 @@ async function changePassword() {
   const errEl = document.getElementById('cp-error'); errEl.innerText = '';
   const currentPassword = document.getElementById('cp-current').value;
   const newPassword = document.getElementById('cp-new').value;
-  if (!currentPassword || !newPassword) { errEl.innerText = 'Both fields required.'; return; }
+  const confirmNewPassword = document.getElementById('cp-new-confirm').value;
+  
+  if (!currentPassword || !newPassword) { errEl.innerText = 'All fields are required.'; return; }
+  if (newPassword !== confirmNewPassword) { errEl.innerText = 'New passwords do not match.'; return; }
   if (newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
+  
   try {
     const res = await fetch(API_URL + '/api/change-password', { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ currentPassword, newPassword }) });
     const data = await res.json();
-    if (data.success) { alert('Password changed!'); document.getElementById('change-password-modal').classList.add('hidden'); document.getElementById('cp-current').value=''; document.getElementById('cp-new').value=''; }
+    if (data.success) { alert('Password changed!'); document.getElementById('change-password-modal').classList.add('hidden'); document.getElementById('cp-current').value=''; document.getElementById('cp-new').value=''; document.getElementById('cp-new-confirm').value=''; }
     else { errEl.innerText = data.error || 'Failed.'; }
   } catch (e) { errEl.innerText = 'Network error.'; }
 }
