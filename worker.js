@@ -63,12 +63,12 @@ async function handleApi(request, env, ctx, url) {
   // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
-    if (!email || !password || String(password).length < 6)
+    if (!email || !password || String(password).length < 8)
       return json({ error: 'Email and a password of 6+ characters required.' }, 400);
     
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
-    const nextUserNumber = Math.max(101, (maxUser.max_num || 0) + 1);
+    const nextUserNumber = Math.max(103, (maxUser.max_num || 0) + 1);
     
     try {
       await env.DB.prepare("INSERT INTO users (email, password, name, is_paid, user_number, created_at) VALUES (?, ?, ?, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
