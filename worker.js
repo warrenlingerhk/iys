@@ -1,4 +1,9 @@
-// Test
+
+
+// --- CONFIG ---
+const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
+// PASTE YOUR /exec LINK HERE ONCE YOU HAVE IT
+const AMS_WEBHOOK_URL = 'PASTE_YOUR_EXEC_LINK_HERE'; 
 
 export default {
   async fetch(request, env, ctx) {
@@ -14,6 +19,23 @@ export default {
 async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
+
+  // --- FETCH LESSON CONTENT FROM GOOGLE SHEET ---
+  if (path === '/api/lesson' && method === 'GET') {
+    const lessonId = url.searchParams.get('id');
+    if (!lessonId) return json({ error: 'Missing Lesson ID' }, 400);
+    
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${CMS_SHEET_ID}/export?format=csv&sheet=${lessonId}`;
+    try {
+      const res = await fetch(sheetUrl);
+      if (!res.ok) return json({ error: 'Lesson not found in sheet' }, 404);
+      const csv = await res.text();
+      const rows = await parseCSV(csv);
+      return json(rows.slice(1)); // Return rows without header
+    } catch (e) {
+      return json({ error: 'Failed to fetch lesson' }, 500);
+    }
+  }
 
   // --- PASSWORD CHANGE ---
   if (path === '/api/change-password' && method === 'POST') {
@@ -73,139 +95,62 @@ async function handleApi(request, env, ctx, url) {
       return json(res.results);
     }
     if (method === 'POST') {
-      const { progress } = await request.json();
+      const body = await request.json();
+      const progress = body.progress || [];
+      const lessonId = body.lesson; // Capture the lesson ID
+      
       for (const item of progress) {
-        await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))").bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'module_completion').run();
+        await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))").bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
       }
-      if (env.GOOGLE_WEBHOOK_URL) {
+      
+      // Sync to AMS (Google Sheet)
+      if (AMS_WEBHOOK_URL && AMS_WEBHOOK_URL !== 'PASTE_YOUR_EXEC_LINK_HERE' && lessonId) {
         const user = await env.DB.prepare('SELECT email, name, member_number FROM users WHERE id = ?').bind(userId).first();
-        ctx.waitUntil(syncSheet(env.GOOGLE_WEBHOOK_URL, user.email, user.name, user.member_number, progress));
+        ctx.waitUntil(fetch(AMS_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            lesson: lessonId,
+            email: user.email,
+            name: user.name,
+            member_number: user.member_number,
+            progress: progress
+          })
+        }).catch(e => console.error('AMS Sync failed', e)));
       }
+      
       return json({ success: true });
     }
-  }
-
-  // --- COMMUNITY ---
-  if (path === '/api/posts' && method === 'GET') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.banned = 0 ORDER BY p.pinned DESC, p.created_at DESC`).bind(userId).all();
-    for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.banned = 0 ORDER BY p.created_at ASC`).bind(userId, post.id).all();
-    }
-    return json(posts.results);
-  }
-  if (path === '/api/posts' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const { content, parent_id } = await request.json();
-    if (!content) return json({ error: 'Post cannot be empty.' }, 400);
-    const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)').bind(userId, content, parent_id || null).run();
-    return json({ id: res.meta.last_row_id });
-  }
-  if (path === '/api/posts/delete' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
-    const { post_id } = await request.json();
-    await env.DB.prepare('DELETE FROM posts WHERE id = ? OR parent_id = ?').bind(post_id, post_id).run();
-    return json({ success: true });
-  }
-  if (path === '/api/posts/pin' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
-    const { post_id } = await request.json();
-    await env.DB.prepare('UPDATE posts SET pinned = NOT pinned WHERE id = ?').bind(post_id).run();
-    return json({ success: true });
-  }
-  if (path === '/api/posts/pin-course' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
-    const { post_id } = await request.json();
-    await env.DB.prepare('UPDATE posts SET pinned_to_course = NOT pinned_to_course WHERE id = ?').bind(post_id).run();
-    return json({ success: true });
-  }
-  if (path === '/api/posts/comments' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
-    const { post_id } = await request.json();
-    await env.DB.prepare('UPDATE posts SET comments_disabled = NOT comments_disabled WHERE id = ?').bind(post_id).run();
-    return json({ success: true });
-  }
-  if (path === '/api/users/ban' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
-    const { user_id } = await request.json();
-    await env.DB.prepare('UPDATE users SET banned = 1 WHERE id = ?').bind(user_id).run();
-    return json({ success: true });
-  }
-  if (path === '/api/reports' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const { post_id, reason } = await request.json();
-    await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)').bind(post_id, userId, reason || '').run();
-    return json({ success: true });
-  }
-  if (path === '/api/likes' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const { post_id } = await request.json();
-    try { await env.DB.prepare('INSERT INTO likes (post_id, user_id) VALUES (?, ?)').bind(post_id, userId).run(); return json({ liked: true }); } 
-    catch (e) { await env.DB.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').bind(post_id, userId).run(); return json({ liked: false }); }
-  }
-
-  // --- ME ---
-  if (path === '/api/me' && method === 'GET') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT name, is_admin, member_number FROM users WHERE id = ?').bind(userId).first();
-    return json(user);
   }
 
   // --- ADMIN ---
   if (path === '/api/admin/pending' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    // Find users who have NOT been granted access to any offer yet
     const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.member_number, u.created_at FROM users u LEFT JOIN offer_access oa ON u.id = oa.user_id WHERE oa.user_id IS NULL AND u.is_admin = 0 AND u.banned = 0 ORDER BY u.created_at ASC`).all();
     return json(res.results);
   }
-
   if (path === '/api/admin/approve' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { user_id } = await request.json();
-    // Grant access to the main course
     await env.DB.prepare('INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, ?)').bind(user_id, 'IYS Course').run();
     return json({ success: true });
   }
-
   if (path === '/api/admin/notifications' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
     return json({ reports: reports.c });
   }
-
   if (path === '/api/my-offers' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const res = await env.DB.prepare('SELECT offer FROM offer_access WHERE user_id = ?').bind(userId).all();
     return json(res.results.map(r => r.offer));
   }
-
   if (path === '/api/admin/access' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const res = await env.DB.prepare('SELECT user_id, offer FROM offer_access').all();
     return json(res.results);
   }
-
   if (path === '/api/admin/access' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { user_id, offer, granted } = await request.json();
@@ -213,7 +158,6 @@ async function handleApi(request, env, ctx, url) {
     else await env.DB.prepare('DELETE FROM offer_access WHERE user_id = ? AND offer = ?').bind(user_id, offer).run();
     return json({ success: true });
   }
-
   if (path === '/api/admin/set-admin' && method === 'POST') {
     const adminId = await requireAdmin(request, env);
     if (!adminId) return json({ error: 'Forbidden' }, 403);
@@ -222,47 +166,41 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('UPDATE users SET is_admin = ? WHERE id = ?').bind(is_admin ? 1 : 0, user_id).run();
     return json({ success: true });
   }  
-
   if (path === '/api/admin/stats' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
     const posts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
     const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports').first();
-    const mod1 = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE item_id = 'module-mod-1' AND completed = 1").first();
+    const mod1 = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE item_id LIKE 'l01-%' AND completed = 1").first();
     return json({ users: users.c, posts: posts.c, reports: reports.c, mod1: mod1.c });
   }
-
   if (path === '/api/admin/reports' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const res = await env.DB.prepare(`SELECT r.id, r.reason, r.created_at, r.resolved, p.content as post_content, p.id as post_id, p.user_id, u.name as reporter_name, au.name as reported_user_name, au.is_admin as reported_user_is_admin FROM reports r LEFT JOIN posts p ON r.post_id = p.id LEFT JOIN users u ON r.reporter_id = u.id LEFT JOIN users au ON p.user_id = au.id ORDER BY r.resolved ASC, r.created_at DESC LIMIT 50`).all();
     return json(res.results);
   }
-
   if (path === '/api/admin/reports/resolve' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { report_id, resolved } = await request.json();
     await env.DB.prepare('UPDATE reports SET resolved = ? WHERE id = ?').bind(resolved ? 1 : 0, report_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/admin/reports/delete' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { report_id } = await request.json();
     await env.DB.prepare('DELETE FROM reports WHERE id = ?').bind(report_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/admin/users' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const res = await env.DB.prepare('SELECT id, name, email, member_number, is_admin, banned, created_at FROM users ORDER BY member_number ASC').all();
     return json(res.results);
   }
-
   if (path === '/api/admin/analytics' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const totalUsers = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
     const activeLearners = await env.DB.prepare('SELECT COUNT(DISTINCT user_id) as c FROM progress').first();
-    const elite = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE item_id = 'module-mod-6' AND completed = 1").first();
+    const elite = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE completed = 1").first();
     const eliteRate = totalUsers.c > 0 ? Math.round((elite.c / totalUsers.c) * 100) : 0;
     const totalPosts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
     const engagement = totalUsers.c > 0 ? (totalPosts.c / totalUsers.c).toFixed(1) : 0;
@@ -300,6 +238,15 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-async function syncSheet(webhookUrl, email, name, member_number, progress) {
-  try { await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, member_number, progress }) }); } catch (e) {}
+async function parseCSV(text) {
+  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; }
+    else if ((char === '\n' || char === '\r') && !inQuotes) { if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); } currentRow = []; currentCell = ''; if (char === '\r' && text[i+1] === '\n') i++; }
+    else currentCell += char;
+  }
+  if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
+  return rows;
 }
