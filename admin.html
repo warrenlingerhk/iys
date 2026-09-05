@@ -55,13 +55,10 @@ td input[type="checkbox"]{width:18px;height:18px;accent-color:var(--pink);cursor
 <main class="wrap">
   <h1>Admin Dashboard</h1>
   <div class="cards" id="stats"></div>
-  
   <h2>Pending Approvals</h2>
   <div id="pending"></div>
-  
   <h2>Analytics</h2>
   <div class="cards" id="analytics"></div>
-  
   <h2>Classmates (Admin + Lesson Access)</h2>
   <div class="table-wrap">
     <table id="users-table">
@@ -69,7 +66,6 @@ td input[type="checkbox"]{width:18px;height:18px;accent-color:var(--pink);cursor
       <tbody id="users-body"></tbody>
     </table>
   </div>
-  
   <h2>Reports</h2>
   <div id="reports"></div>
 </main>
@@ -129,8 +125,7 @@ async function loadLessonNames() {
 async function loadStats() {
   try {
     const s = await api('/api/admin/stats');
-    document.getElementById('stats').innerHTML =
-      card(s.users, 'Classmates') + card(s.posts, 'Posts') + card(s.reports, 'Reports') + card(s.mod1, 'Module 1 completed');
+    document.getElementById('stats').innerHTML = card(s.users, 'Classmates') + card(s.posts, 'Posts') + card(s.reports, 'Reports') + card(s.mod1, 'Module 1 completed');
   } catch (e) { console.error(e); }
 }
 
@@ -156,9 +151,7 @@ async function approveUser(id) {
 async function loadAnalytics() {
   try {
     const a = await api('/api/admin/analytics');
-    document.getElementById('analytics').innerHTML =
-      card(a.totalUsers, 'Total classmates') + card(a.activeLearners, 'Active learners') +
-      card(a.eliteRate + '%', 'Completion rate') + card(a.engagement, 'Engagement') + card(a.healthRatio, 'Health ratio');
+    document.getElementById('analytics').innerHTML = card(a.totalUsers, 'Total classmates') + card(a.activeLearners, 'Active learners') + card(a.eliteRate + '%', 'Completion rate') + card(a.engagement, 'Engagement') + card(a.healthRatio, 'Health ratio');
   } catch (e) { console.error(e); }
 }
 
@@ -171,7 +164,7 @@ async function loadUsers() {
     accessRows.forEach(r => { (access[r.user_id] = access[r.user_id] || []).push(r.offer); });
 
     document.querySelector('#users-table thead').innerHTML =
-      '<tr><th>#</th><th>Name</th><th>Email</th><th>Admin</th><th>Paid</th><th>Joined</th>' +
+      '<tr><th>#</th><th>Name</th><th>Email</th><th>Admin</th><th>Paid</th><th>Joined</th><th>Actions</th>' +
       LESSON_NAMES.map(o => '<th>' + o + '</th>').join('') + '</tr>';
 
     document.getElementById('users-body').innerHTML = users.map(u => {
@@ -180,23 +173,33 @@ async function loadUsers() {
         '<td><input type="checkbox" ' + (u.is_admin ? 'checked' : '') + ' onchange="setAdmin(' + u.id + ', this.checked)"></td>' +
         '<td>' + (u.is_paid ? 'Yes' : 'No') + '</td>' +
         '<td>' + (u.created_at || '').slice(0, 10) + '</td>' +
+        '<td><button class="btn ghost" style="font-size:.75rem;padding:4px 10px" onclick="resetUserPassword(' + u.id + ', \'' + u.name.replace(/'/g, "\\'") + '\')">Reset PW</button></td>' +
         LESSON_NAMES.map(o => '<td><input type="checkbox" ' + (my.indexOf(o) !== -1 ? 'checked' : '') + ' onchange="setAccess(' + u.id + ',\'' + o + '\', this.checked)"></td>').join('') +
         '</tr>';
     }).join('');
   } catch (e) { console.error(e); }
 }
 
-async function setAdmin(id, on) {
+async function resetUserPassword(userId, userName) {
+  const newPw = prompt('Enter a temporary 8+ character password for ' + userName + ':');
+  if (!newPw) return;
+  if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
+  
   try {
-    await api('/api/admin/set-admin', { method: 'POST', body: JSON.stringify({ user_id: id, is_admin: on }) });
-  } catch (e) { alert(e.message); }
+    await api('/api/admin/reset-password', { method: 'POST', body: JSON.stringify({ user_id: userId, new_password: newPw }) });
+    alert('Password for ' + userName + ' has been reset to: ' + newPw);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function setAdmin(id, on) {
+  try { await api('/api/admin/set-admin', { method: 'POST', body: JSON.stringify({ user_id: id, is_admin: on }) }); } catch (e) { alert(e.message); }
   loadUsers();
 }
 
 async function setAccess(id, offer, on) {
-  try {
-    await api('/api/admin/access', { method: 'POST', body: JSON.stringify({ user_id: id, offer: offer, granted: on }) });
-  } catch (e) { alert(e.message); }
+  try { await api('/api/admin/access', { method: 'POST', body: JSON.stringify({ user_id: id, offer: offer, granted: on }) }); } catch (e) { alert(e.message); }
   loadUsers();
 }
 
@@ -207,8 +210,7 @@ async function loadReports() {
     if (!reports.length) { host.innerHTML = '<p class="empty">No reports. 🎉</p>'; return; }
     host.innerHTML = reports.map(r =>
       '<div class="report">' +
-        '<div class="meta">Reported by ' + (r.reporter_name || 'Unknown') + ' → ' + (r.reported_user_name || 'Deleted user') +
-          ' on ' + (r.created_at || '').slice(0, 10) + (r.resolved ? ' <span class="resolved-tag">• RESOLVED</span>' : '') + '</div>' +
+        '<div class="meta">Reported by ' + (r.reporter_name || 'Unknown') + ' → ' + (r.reported_user_name || 'Deleted user') + ' on ' + (r.created_at || '').slice(0, 10) + (r.resolved ? ' <span class="resolved-tag">• RESOLVED</span>' : '') + '</div>' +
         '<div class="content">' + (r.post_content || '[post deleted]') + '</div>' +
         (r.reason ? '<div class="meta">Reason: ' + r.reason + '</div>' : '') +
         '<div class="actions">' +
@@ -231,11 +233,7 @@ async function deleteReport(id) {
 }
 
 loadLessonNames().then(function(){
-  loadStats();
-  loadPending();
-  loadAnalytics();
-  loadUsers();
-  loadReports();
+  loadStats(); loadPending(); loadAnalytics(); loadUsers(); loadReports();
 });
 </script>
 </body>
