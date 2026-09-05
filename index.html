@@ -285,9 +285,8 @@ async function login() {
     const data = await res.json();
     if (data.token) {
       localStorage.setItem('token', data.token);
-      localStorage.setItem('iys_is_paid', data.is_paid);
       localStorage.setItem('iys_is_admin', data.is_admin);
-      localStorage.setItem('iys_name', data.name || email.split('@')[0]);
+      localStorage.setItem('iys_name', name);
       localStorage.setItem('iys_email', email.toLowerCase());
       showHome();
     } else { errEl.innerText = data.error || 'Something went wrong.'; }
