@@ -20,16 +20,9 @@ async function handleApi(request, env, ctx, url) {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const { currentPassword, newPassword } = await request.json();
-    
-    if (!newPassword || String(newPassword).length < 8) {
-      return json({ error: 'New password must be at least 8 characters.' }, 400);
-    }
-
+    if (!newPassword || String(newPassword).length < 8) return json({ error: 'New password must be at least 8 characters.' }, 400);
     const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
-    if (!user || user.password !== await hashPassword(currentPassword || '')) {
-      return json({ error: 'Current password is incorrect.' }, 401);
-    }
-
+    if (!user || user.password !== await hashPassword(currentPassword || '')) return json({ error: 'Current password is incorrect.' }, 401);
     const newHash = await hashPassword(newPassword);
     await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, userId).run();
     return json({ success: true });
@@ -39,52 +32,35 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/admin/reset-password' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { user_id, new_password } = await request.json();
-    
-    if (!new_password || String(new_password).length < 8) {
-      return json({ error: 'New password must be at least 8 characters.' }, 400);
-    }
-
+    if (!new_password || String(new_password).length < 8) return json({ error: 'New password must be at least 8 characters.' }, 400);
     const newHash = await hashPassword(new_password);
     await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, user_id).run();
-    return json({ success: true, message: 'Password reset successfully.' });
+    return json({ success: true });
   }
 
   // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
-    if (!email || !password || String(password).length < 8)
-      return json({ error: 'Email and a password of 8+ characters required.' }, 400);
-    
+    if (!email || !password || String(password).length < 8) return json({ error: 'Email and a password of 8+ characters required.' }, 400);
     const hash = await hashPassword(password);
     const maxMember = await env.DB.prepare('SELECT MAX(member_number) as max_num FROM users').first();
     const nextMemberNumber = Math.max(103, (maxMember.max_num || 0) + 1);
-    
     try {
       await env.DB.prepare("INSERT INTO users (email, password, name, is_admin, member_number, created_at) VALUES (?, ?, ?, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextMemberNumber).run();
-    } catch (e) { 
-      return json({ error: 'That email is already registered.' }, 409); 
-    }
-    
+    } catch (e) { return json({ error: 'That email is already registered.' }, 409); }
     const user = await env.DB.prepare('SELECT id, name, is_admin, member_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
-    
     return json({ token, name: user.name, is_admin: user.is_admin, member_number: user.member_number });
   }
 
   if (path === '/api/login' && method === 'POST') {
     const { email, password } = await request.json();
     const user = await env.DB.prepare('SELECT id, password, name, is_admin, member_number, banned FROM users WHERE email = ?').bind((email || '').toLowerCase()).first();
-    
-    if (!user || user.password !== await hashPassword(password || ''))
-      return json({ error: 'Invalid email or password.' }, 401);
-    
-    if (user.banned) 
-      return json({ error: 'This account has been banned.' }, 403);
-    
+    if (!user || user.password !== await hashPassword(password || '')) return json({ error: 'Invalid email or password.' }, 401);
+    if (user.banned) return json({ error: 'This account has been banned.' }, 403);
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
-    
     return json({ token, name: user.name, is_admin: user.is_admin, member_number: user.member_number });
   }
 
@@ -92,12 +68,10 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/progress') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    
     if (method === 'GET') {
       const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(userId).all();
       return json(res.results);
     }
-    
     if (method === 'POST') {
       const { progress } = await request.json();
       for (const item of progress) {
@@ -121,7 +95,6 @@ async function handleApi(request, env, ctx, url) {
     }
     return json(posts.results);
   }
-
   if (path === '/api/posts' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -130,7 +103,6 @@ async function handleApi(request, env, ctx, url) {
     const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)').bind(userId, content, parent_id || null).run();
     return json({ id: res.meta.last_row_id });
   }
-
   if (path === '/api/posts/delete' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -140,7 +112,6 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('DELETE FROM posts WHERE id = ? OR parent_id = ?').bind(post_id, post_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/posts/pin' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -150,7 +121,6 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('UPDATE posts SET pinned = NOT pinned WHERE id = ?').bind(post_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/posts/pin-course' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -160,7 +130,6 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('UPDATE posts SET pinned_to_course = NOT pinned_to_course WHERE id = ?').bind(post_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/posts/comments' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -170,7 +139,6 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('UPDATE posts SET comments_disabled = NOT comments_disabled WHERE id = ?').bind(post_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/users/ban' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -180,7 +148,6 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('UPDATE users SET banned = 1 WHERE id = ?').bind(user_id).run();
     return json({ success: true });
   }
-
   if (path === '/api/reports' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -188,18 +155,12 @@ async function handleApi(request, env, ctx, url) {
     await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)').bind(post_id, userId, reason || '').run();
     return json({ success: true });
   }
-
   if (path === '/api/likes' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const { post_id } = await request.json();
-    try {
-      await env.DB.prepare('INSERT INTO likes (post_id, user_id) VALUES (?, ?)').bind(post_id, userId).run();
-      return json({ liked: true });
-    } catch (e) {
-      await env.DB.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').bind(post_id, userId).run();
-      return json({ liked: false });
-    }
+    try { await env.DB.prepare('INSERT INTO likes (post_id, user_id) VALUES (?, ?)').bind(post_id, userId).run(); return json({ liked: true }); } 
+    catch (e) { await env.DB.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').bind(post_id, userId).run(); return json({ liked: false }); }
   }
 
   // --- ME ---
@@ -210,7 +171,22 @@ async function handleApi(request, env, ctx, url) {
     return json(user);
   }
 
-  // --- ADMIN FUNCTIONS ---
+  // --- ADMIN ---
+  if (path === '/api/admin/pending' && method === 'GET') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    // Find users who have NOT been granted access to any offer yet
+    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.member_number, u.created_at FROM users u LEFT JOIN offer_access oa ON u.id = oa.user_id WHERE oa.user_id IS NULL AND u.is_admin = 0 AND u.banned = 0 ORDER BY u.created_at ASC`).all();
+    return json(res.results);
+  }
+
+  if (path === '/api/admin/approve' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id } = await request.json();
+    // Grant access to the main course
+    await env.DB.prepare('INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, ?)').bind(user_id, 'IYS Course').run();
+    return json({ success: true });
+  }
+
   if (path === '/api/admin/notifications' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
@@ -233,11 +209,8 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/admin/access' && method === 'POST') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const { user_id, offer, granted } = await request.json();
-    if (granted) {
-      await env.DB.prepare('INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, ?)').bind(user_id, offer).run();
-    } else {
-      await env.DB.prepare('DELETE FROM offer_access WHERE user_id = ? AND offer = ?').bind(user_id, offer).run();
-    }
+    if (granted) await env.DB.prepare('INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, ?)').bind(user_id, offer).run();
+    else await env.DB.prepare('DELETE FROM offer_access WHERE user_id = ? AND offer = ?').bind(user_id, offer).run();
     return json({ success: true });
   }
 
@@ -328,7 +301,5 @@ function json(data, status = 200) {
 }
 
 async function syncSheet(webhookUrl, email, name, member_number, progress) {
-  try { 
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, member_number, progress }) }); 
-  } catch (e) {}
+  try { await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, member_number, progress }) }); } catch (e) {}
 }
