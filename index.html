@@ -225,12 +225,14 @@ function showAuth(type) { hideAllViews(); document.getElementById(type === 'sign
 function logout(){ localStorage.clear(); showHome(); }
 
 function getGradient(tone) {
-    if (tone <= 21) {
-        const h = 190 + (tone * 0.5);
-        return `linear-gradient(135deg, hsl(${h}, 70%, 50%) 0%, hsl(${h-20}, 80%, 60%) 100%)`;
+    if (tone >= 1 && tone <= 23) {
+        const startHue = 190 + (tone * 3);
+        const endHue = startHue + 20;
+        return `linear-gradient(135deg, hsl(${startHue}, 75%, 55%) 0%, hsl(${endHue}, 80%, 60%) 100%)`;
     } else {
-        const h = 300 + ((tone - 21) * 3);
-        return `linear-gradient(135deg, hsl(${h}, 70%, 50%) 0%, hsl(${h+20}, 80%, 60%) 100%)`;
+        const startHue = 300 + ((tone - 24) * 8);
+        const endHue = startHue + 30;
+        return `linear-gradient(135deg, hsl(${startHue}, 80%, 55%) 0%, hsl(${endHue}, 85%, 60%) 100%)`;
     }
 }
 
