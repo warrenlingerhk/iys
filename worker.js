@@ -49,25 +49,6 @@ async function handleApi(request, env, ctx, url) {
     return json({ success: true, message: 'Password reset successfully.' });
   }
 
-  // --- FORMS (WEBHOOKS) ---
-  if (path === '/api/scholarship' && method === 'POST') {
-    const data = await request.json();
-    if (!env.SCHOLARSHIP_WEBHOOK_URL) return json({ error: 'Webhook not configured' }, 500);
-    const gRes = await fetch(env.SCHOLARSHIP_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(data) });
-    const gText = await gRes.text();
-    if (!gRes.ok || gText.indexOf('{') === -1) return json({ error: 'Google rejected the request.' }, 502);
-    return json({ success: true });
-  }
-
-  if (path === '/api/moneyback' && method === 'POST') {
-    const data = await request.json();
-    if (!env.MONEYBACK_WEBHOOK_URL) return json({ error: 'Webhook not configured' }, 500);
-    const gRes = await fetch(env.MONEYBACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(data) });
-    const gText = await gRes.text();
-    if (!gRes.ok || gText.indexOf('{') === -1) return json({ error: 'Google rejected the request.' }, 502);
-    return json({ success: true });
-  }
-
   // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
@@ -75,25 +56,25 @@ async function handleApi(request, env, ctx, url) {
       return json({ error: 'Email and a password of 8+ characters required.' }, 400);
     
     const hash = await hashPassword(password);
-    const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
-    const nextUserNumber = Math.max(103, (maxUser.max_num || 0) + 1);
+    const maxMember = await env.DB.prepare('SELECT MAX(member_number) as max_num FROM users').first();
+    const nextMemberNumber = Math.max(103, (maxMember.max_num || 0) + 1);
     
     try {
-      await env.DB.prepare("INSERT INTO users (email, password, name, is_paid, is_admin, user_number, created_at) VALUES (?, ?, ?, 0, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
+      await env.DB.prepare("INSERT INTO users (email, password, name, is_admin, member_number, created_at) VALUES (?, ?, ?, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextMemberNumber).run();
     } catch (e) { 
       return json({ error: 'That email is already registered.' }, 409); 
     }
     
-    const user = await env.DB.prepare('SELECT id, name, is_paid, is_admin, user_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
+    const user = await env.DB.prepare('SELECT id, name, is_admin, member_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
     
-    return json({ token, name: user.name, is_paid: user.is_paid, is_admin: user.is_admin, user_number: user.user_number });
+    return json({ token, name: user.name, is_admin: user.is_admin, member_number: user.member_number });
   }
 
   if (path === '/api/login' && method === 'POST') {
     const { email, password } = await request.json();
-    const user = await env.DB.prepare('SELECT id, password, name, is_paid, is_admin, user_number, banned FROM users WHERE email = ?').bind((email || '').toLowerCase()).first();
+    const user = await env.DB.prepare('SELECT id, password, name, is_admin, member_number, banned FROM users WHERE email = ?').bind((email || '').toLowerCase()).first();
     
     if (!user || user.password !== await hashPassword(password || ''))
       return json({ error: 'Invalid email or password.' }, 401);
@@ -104,7 +85,7 @@ async function handleApi(request, env, ctx, url) {
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
     
-    return json({ token, name: user.name, is_paid: user.is_paid, is_admin: user.is_admin, user_number: user.user_number });
+    return json({ token, name: user.name, is_admin: user.is_admin, member_number: user.member_number });
   }
 
   // --- PROGRESS ---
@@ -123,8 +104,8 @@ async function handleApi(request, env, ctx, url) {
         await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))").bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'module_completion').run();
       }
       if (env.GOOGLE_WEBHOOK_URL) {
-        const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
-        ctx.waitUntil(syncSheet(env.GOOGLE_WEBHOOK_URL, user.email, user.name, user.user_number, progress));
+        const user = await env.DB.prepare('SELECT email, name, member_number FROM users WHERE id = ?').bind(userId).first();
+        ctx.waitUntil(syncSheet(env.GOOGLE_WEBHOOK_URL, user.email, user.name, user.member_number, progress));
       }
       return json({ success: true });
     }
@@ -225,33 +206,17 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/me' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT name, is_paid, is_admin, user_number FROM users WHERE id = ?').bind(userId).first();
+    const user = await env.DB.prepare('SELECT name, is_admin, member_number FROM users WHERE id = ?').bind(userId).first();
     return json(user);
   }
 
-  // --- APPROVALS & NOTIFICATIONS ---
-  if (path === '/api/admin/pending' && method === 'GET') {
-    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare('SELECT id, name, email, user_number, created_at FROM users WHERE is_paid = 0 AND banned = 0 ORDER BY created_at ASC').all();
-    return json(res.results);
-  }
-
-  if (path === '/api/admin/approve' && method === 'POST') {
-    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const { user_id } = await request.json();
-    await env.DB.prepare('UPDATE users SET is_paid = 1 WHERE id = ?').bind(user_id).run();
-    await env.DB.prepare('INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, ?)').bind(user_id, 'IYS Lesson').run();
-    return json({ success: true });
-  }
-
+  // --- ADMIN FUNCTIONS ---
   if (path === '/api/admin/notifications' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const pending = await env.DB.prepare('SELECT COUNT(*) as c FROM users WHERE is_paid = 0 AND banned = 0').first();
     const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
-    return json({ pending: pending.c, reports: reports.c });
+    return json({ reports: reports.c });
   }
 
-  // --- MY LESSON ACCESS & ADMIN STATUS ---
   if (path === '/api/my-offers' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -285,7 +250,6 @@ async function handleApi(request, env, ctx, url) {
     return json({ success: true });
   }  
 
-  // --- ADMIN DASHBOARD ---
   if (path === '/api/admin/stats' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
     const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
@@ -317,7 +281,7 @@ async function handleApi(request, env, ctx, url) {
 
   if (path === '/api/admin/users' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare('SELECT id, name, email, user_number, is_paid, banned, created_at FROM users ORDER BY user_number ASC').all();
+    const res = await env.DB.prepare('SELECT id, name, email, member_number, is_admin, banned, created_at FROM users ORDER BY member_number ASC').all();
     return json(res.results);
   }
 
@@ -363,8 +327,8 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-async function syncSheet(webhookUrl, email, name, user_number, progress) {
+async function syncSheet(webhookUrl, email, name, member_number, progress) {
   try { 
-    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, user_number, progress }) }); 
+    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, member_number, progress }) }); 
   } catch (e) {}
 }
