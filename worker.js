@@ -15,63 +15,71 @@ async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
+  // --- PASSWORD CHANGE ---
+  if (path === '/api/change-password' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const { currentPassword, newPassword } = await request.json();
+    
+    if (!newPassword || String(newPassword).length < 8) {
+      return json({ error: 'New password must be at least 8 characters.' }, 400);
+    }
+
+    const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
+    if (!user || user.password !== await hashPassword(currentPassword || '')) {
+      return json({ error: 'Current password is incorrect.' }, 401);
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, userId).run();
+    return json({ success: true });
+  }
+
+  // --- ADMIN PASSWORD RESET ---
+  if (path === '/api/admin/reset-password' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id, new_password } = await request.json();
+    
+    if (!new_password || String(new_password).length < 8) {
+      return json({ error: 'New password must be at least 8 characters.' }, 400);
+    }
+
+    const newHash = await hashPassword(new_password);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, user_id).run();
+    return json({ success: true, message: 'Password reset successfully.' });
+  }
+
   // --- FORMS (WEBHOOKS) ---
   if (path === '/api/scholarship' && method === 'POST') {
     const data = await request.json();
     if (!env.SCHOLARSHIP_WEBHOOK_URL) return json({ error: 'Webhook not configured' }, 500);
-
-    const gRes = await fetch(env.SCHOLARSHIP_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(data)
-    });
+    const gRes = await fetch(env.SCHOLARSHIP_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(data) });
     const gText = await gRes.text();
-
-    if (!gRes.ok || gText.indexOf('{') === -1) {
-      return json({ error: 'Google rejected the request. In Apps Script, set deployment access to "Anyone".' }, 502);
-    }
-    let parsed = null;
-    try { parsed = JSON.parse(gText); } catch (e) {}
-    if (parsed && parsed.result === 'error') {
-      return json({ error: 'Sheet error: ' + parsed.message }, 500);
-    }
+    if (!gRes.ok || gText.indexOf('{') === -1) return json({ error: 'Google rejected the request.' }, 502);
     return json({ success: true });
   }
 
   if (path === '/api/moneyback' && method === 'POST') {
     const data = await request.json();
     if (!env.MONEYBACK_WEBHOOK_URL) return json({ error: 'Webhook not configured' }, 500);
-
-    const gRes = await fetch(env.MONEYBACK_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(data)
-    });
+    const gRes = await fetch(env.MONEYBACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(data) });
     const gText = await gRes.text();
-
-    if (!gRes.ok || gText.indexOf('{') === -1) {
-      return json({ error: 'Google rejected the request. In Apps Script, set deployment access to "Anyone".' }, 502);
-    }
-    let parsed = null;
-    try { parsed = JSON.parse(gText); } catch (e) {}
-    if (parsed && parsed.result === 'error') {
-      return json({ error: 'Sheet error: ' + parsed.message }, 500);
-    }
+    if (!gRes.ok || gText.indexOf('{') === -1) return json({ error: 'Google rejected the request.' }, 502);
     return json({ success: true });
   }
 
   // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
-  if (!email || !password || String(password).length < 8)
-    return json({ error: 'Email and a password of 8+ characters required.' }, 400);
+    if (!email || !password || String(password).length < 8)
+      return json({ error: 'Email and a password of 8+ characters required.' }, 400);
     
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
     const nextUserNumber = Math.max(103, (maxUser.max_num || 0) + 1);
     
     try {
-      await env.DB.prepare("INSERT INTO users (email, password, name, is_paid, user_number, created_at) VALUES (?, ?, ?, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
+      await env.DB.prepare("INSERT INTO users (email, password, name, is_paid, is_admin, user_number, created_at) VALUES (?, ?, ?, 0, 0, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
     } catch (e) { 
       return json({ error: 'That email is already registered.' }, 409); 
     }
@@ -126,25 +134,9 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/posts' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    
-    const posts = await env.DB.prepare(`
-      SELECT p.*, u.name as user_name, u.id as user_id,
-      (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-      (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
-      FROM posts p JOIN users u ON p.user_id = u.id 
-      WHERE p.parent_id IS NULL AND u.banned = 0
-      ORDER BY p.pinned DESC, p.created_at DESC
-    `).bind(userId).all();
-
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.banned = 0 ORDER BY p.pinned DESC, p.created_at DESC`).bind(userId).all();
     for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`
-        SELECT p.*, u.name as user_name, u.id as user_id,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
-        FROM posts p JOIN users u ON p.user_id = u.id 
-        WHERE p.parent_id = ? AND u.banned = 0
-        ORDER BY p.created_at ASC
-      `).bind(userId, post.id).all();
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.banned = 0 ORDER BY p.created_at ASC`).bind(userId, post.id).all();
     }
     return json(posts.results);
   }
@@ -237,39 +229,6 @@ async function handleApi(request, env, ctx, url) {
     return json(user);
   }
 
-    // --- CHANGE PASSWORD ---
-  if (path === '/api/change-password' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    
-    const { currentPassword, newPassword } = await request.json();
-    if (!currentPassword || !newPassword || String(newPassword).length < 8) {
-      return json({ error: 'New password must be at least 8 characters.' }, 400);
-    }
-
-    const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
-    if (!user || user.password !== await hashPassword(currentPassword)) {
-      return json({ error: 'Current password is incorrect.' }, 401);
-    }
-
-    const newHash = await hashPassword(newPassword);
-    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, userId).run();
-    
-    return json({ success: true, message: 'Password updated successfully.' });
-  }
-
-  // --- ADMIN RESET PASSWORD ---
-  if (path === '/api/admin/reset-password' && method === 'POST') {
-    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const { user_id, newPassword } = await request.json();
-    if (!newPassword || String(newPassword).length < 8) {
-      return json({ error: 'New password must be at least 8 characters.' }, 400);
-    }
-    const newHash = await hashPassword(newPassword);
-    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, user_id).run();
-    return json({ success: true });
-  }
-
   // --- APPROVALS & NOTIFICATIONS ---
   if (path === '/api/admin/pending' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
@@ -338,16 +297,7 @@ async function handleApi(request, env, ctx, url) {
 
   if (path === '/api/admin/reports' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare(`
-      SELECT r.id, r.reason, r.created_at, r.resolved,
-      p.content as post_content, p.id as post_id, p.user_id,
-      u.name as reporter_name, au.name as reported_user_name, au.is_admin as reported_user_is_admin
-      FROM reports r
-      LEFT JOIN posts p ON r.post_id = p.id
-      LEFT JOIN users u ON r.reporter_id = u.id
-      LEFT JOIN users au ON p.user_id = au.id
-      ORDER BY r.resolved ASC, r.created_at DESC LIMIT 50
-    `).all();
+    const res = await env.DB.prepare(`SELECT r.id, r.reason, r.created_at, r.resolved, p.content as post_content, p.id as post_id, p.user_id, u.name as reporter_name, au.name as reported_user_name, au.is_admin as reported_user_is_admin FROM reports r LEFT JOIN posts p ON r.post_id = p.id LEFT JOIN users u ON r.reporter_id = u.id LEFT JOIN users au ON p.user_id = au.id ORDER BY r.resolved ASC, r.created_at DESC LIMIT 50`).all();
     return json(res.results);
   }
 
@@ -415,10 +365,6 @@ function json(data, status = 200) {
 
 async function syncSheet(webhookUrl, email, name, user_number, progress) {
   try { 
-    await fetch(webhookUrl, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ email, name, user_number, progress }) 
-    }); 
+    await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ email, name, user_number, progress }) }); 
   } catch (e) {}
 }
