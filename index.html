@@ -25,7 +25,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .btn:hover{transform:translateY(-2px)} .btn.small{padding:6px 16px;font-size:.85rem}
 .btn.ghost{background:transparent;border:2px solid var(--navy);color:var(--navy)}
 .btn.cta{background:var(--pink);border:2px solid var(--pink);color:#fff;box-shadow:0 4px 0 rgba(2,62,138,.25)}
-.name-chip{background:#fff;border:2px solid var(--navy);border-radius:999px;padding:6px 16px;font-size:.85rem;font-weight:800}
+.name-chip{background:#fff;border:2px solid var(--navy);border-radius:999px;padding:6px 16px;font-size:.85rem;font-weight:800;cursor:pointer;transition:background .2s}
+.name-chip:hover{background:var(--lightBlue)}
 .admin-badge{background:var(--pink);color:#fff;border-radius:999px;padding:2px 8px;font-size:.75rem;margin-left:6px}
 .layout{display:grid;grid-template-columns:1.2fr .8fr;gap:28px;padding:26px 0 70px;align-items:start}
 .card{background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(2,62,138,.10)}
@@ -201,8 +202,7 @@ function renderHeader(){
   if (localStorage.getItem('token')) {
     const isAdmin = localStorage.getItem('iys_is_admin') === '1';
     host.innerHTML = (isAdmin ? '<a href="/admin.html" class="btn small ghost" style="background:#fff">Admin</a>' : '') +
-      '<span class="name-chip">' + (name || 'Classmate') + '</span>' +
-      '<button class="btn small ghost" style="background:#fff" onclick="document.getElementById(\'change-password-modal\').classList.remove(\'hidden\')">Change PW</button>' +
+      '<span class="name-chip" onclick="document.getElementById(\'change-password-modal\').classList.remove(\'hidden\')" title="Click to change password">' + (name || 'Classmate') + '</span>' +
       '<button class="btn small ghost" style="background:#fff" onclick="logout()">Log out</button>';
   } else {
     host.innerHTML = '<button class="btn small cta" onclick="showAuth(\'signup\')">Sign Up</button><button class="btn small ghost" onclick="showAuth(\'login\')">Log in</button>';
@@ -211,7 +211,7 @@ function renderHeader(){
 
 function renderLessons(){
   const host = document.getElementById('course-list-home');
-  if (!host || LESSONS.length === 0) return;
+  if (!host || LESSONS.length === 0) { if (host) host.innerHTML = '<p style="text-align:center;color:var(--slate);font-weight:700">Lessons coming soon.</p>'; return; }
   host.innerHTML = LESSONS.map(l => '<div class="course c' + l.tone + '"><h3>' + l.name + '</h3><button class="course-btn" onclick="handleLessonClick(\'' + l.name + '\', ' + l.active + ')">Enter ' + l.name + '</button></div>').join('');
 }
 
