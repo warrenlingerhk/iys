@@ -3,7 +3,7 @@
 // --- CONFIG ---
 const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
 // PASTE YOUR /exec LINK HERE ONCE YOU HAVE IT
-const AMS_WEBHOOK_URL = 'PASTE_YOUR_EXEC_LINK_HERE';
+const AMS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby4JtopoLOxdebbwGAI9U2iZxJH7ld_ekNhVqtex4H0lyK4TvP5aZ4EMd2iFE7d_OOR/exec';
 
 export default {
   async fetch(request, env, ctx) {
