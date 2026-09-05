@@ -1,4 +1,4 @@
-
+// Redeploy fix - Sep 5
 
 export default {
   async fetch(request, env, ctx) {
