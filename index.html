@@ -4,7 +4,6 @@
 <html lang="en">
 <head>
 <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-<link rel="shortcut icon" href="/logo.svg" />
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Influence Your Success — Life Coach Training</title>
@@ -42,6 +41,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .course-list{display:flex;flex-direction:column;gap:14px}
 .course{border-radius:16px;padding:18px 20px;box-shadow:0 6px 0 rgba(2,62,138,.18);color:#fff}
 .course h3{margin:0;font-size:1.2rem;font-weight:800}
+.course-date{font-size:0.9rem;font-weight:700;opacity:0.9;margin-bottom:8px}
 .course-btn{width:100%;padding:10px;border-radius:999px;border:none;background:var(--navy);color:#fff;font-weight:800;cursor:pointer;font-size:1rem;margin:10px 0}
 .course-btn:hover{background:#012a5c}
 .outcomes-list{margin:8px 0 0;padding-left:18px;list-style:disc;font-size:1rem;font-weight:700}
@@ -64,7 +64,10 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .module-section{padding:60px 0; border-bottom:4px solid var(--navy)}
 .bg-mod-1{background:var(--blue); color:#fff} .bg-mod-2{background:var(--lightBlue); color:var(--navy)} .bg-mod-3{background:var(--pink); color:#fff}
 .bg-mod-4{background:var(--navy); color:#fff} .bg-mod-5{background:var(--darkBlue); color:#fff} .bg-mod-6{background:var(--cream); color:var(--navy); border:2px solid var(--navy)}
-.module-header{text-align:center; margin-bottom:40px} .module-header h2{font-size:clamp(2rem,5vw,3rem); font-weight:800; margin:0 0 12px}
+.module-header{text-align:center; margin-bottom:40px; display:flex; align-items:center; justify-content:center; gap:15px;} 
+.module-header h2{font-size:clamp(2rem,5vw,3rem); font-weight:800; margin:0; transition:all 0.3s;}
+.module-header input[type="checkbox"]{width:32px; height:32px; accent-color:var(--pink); cursor:pointer;}
+.module-header.completed h2{text-decoration:line-through; opacity:0.5;}
 .mod-item{background:#fff; color:var(--navy); border-radius:14px; padding:24px 26px; box-shadow:0 5px 0 rgba(2,62,138,.12); margin-bottom:20px; }
 .mod-item.completed{border-left:5px solid var(--pink)}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
@@ -78,6 +81,10 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .answer-box label{display:block; font-weight:800; margin-bottom:8px; color:var(--navy)}
 .answer-input{width:100%; padding:12px 14px; border-radius:8px; border:2px solid var(--slate); font:inherit; font-size:1rem; min-height:100px; resize:vertical}
 .answer-input:focus{outline:none; border-color:var(--pink)}
+.poll-box{display:flex; flex-direction:column; gap:12px; background:#f0f8ff; padding:20px; border-radius:10px; margin:16px 0;}
+.poll-option{display:flex; align-items:center; gap:10px; font-weight:700; cursor:pointer; padding:8px; border-radius:6px;}
+.poll-option:hover{background:rgba(0,180,216,0.1);}
+.poll-option input{width:22px; height:22px; accent-color:var(--pink); cursor:pointer;}
 .module-complete-check{display:flex; align-items:center; gap:12px; margin-top:20px; padding-top:20px; border-top:2px dashed var(--lightBlue)}
 .module-check{width:28px; height:28px; accent-color:var(--pink); cursor:pointer}
 .module-check-label{font-weight:800; font-size:1.1rem; color:var(--navy)}
@@ -157,10 +164,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 <div id="view-course" class="hidden">
   <nav class="module-menu">
     <a href="#" class="back-home" onclick="showHome();return false;" style="color:#fff;font-weight:800">&larr; Back</a>
-    <div class="module-links">
-      <a href="#mod-1">Module 1</a><a href="#mod-2">Module 2</a><a href="#mod-3">Module 3</a>
-      <a href="#mod-4">Module 4</a><a href="#mod-5">Module 5</a><a href="#mod-6">Module 6</a>
-    </div>
+    <div class="module-links" id="module-links"></div>
     <span id="save-status" class="save-status">All changes saved.</span>
   </nav>
   <div id="course-content"></div>
@@ -185,16 +189,23 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 
 <script>
 const API_URL = '';
-const CMS_LESSONS_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_LESSONS_SHEET_ID/pub?gid=0&single=true&output=csv';
-const CMS_CONTENT_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_CONTENT_SHEET_ID/pub?gid=0&single=true&output=csv';
-
-let saveTimeout, LESSONS = [], COURSE_DATA = []; 
+const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs/export?format=csv&sheet=Lessons`;
+let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = ''; 
 
 function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
 function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
 function showAuth(type) { hideAllViews(); document.getElementById(type === 'signup' ? 'view-auth-signup' : 'view-auth-login').classList.remove('hidden'); }
-function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); renderCourse(); history.pushState(null, '', '#course'); window.scrollTo(0,0); }
 function logout(){ localStorage.clear(); showHome(); }
+
+function getGradient(tone) {
+    if (tone <= 21) {
+        const h = 190 + (tone * 0.5);
+        return `linear-gradient(135deg, hsl(${h}, 70%, 50%) 0%, hsl(${h-20}, 80%, 60%) 100%)`;
+    } else {
+        const h = 300 + ((tone - 21) * 3);
+        return `linear-gradient(135deg, hsl(${h}, 70%, 50%) 0%, hsl(${h+20}, 80%, 60%) 100%)`;
+    }
+}
 
 function renderHeader(){
   const host = document.getElementById('head-actions');
@@ -209,21 +220,64 @@ function renderHeader(){
   }
 }
 
-function renderLessons(){
+async function renderLessons(){
   const host = document.getElementById('course-list-home');
-  if (!host || LESSONS.length === 0) { if (host) host.innerHTML = '<p style="text-align:center;color:var(--slate);font-weight:700">Lessons coming soon.</p>'; return; }
-  host.innerHTML = LESSONS.map(l => '<div class="course c' + l.tone + '"><h3>' + l.name + '</h3><button class="course-btn" onclick="handleLessonClick(\'' + l.name + '\', ' + l.active + ')">Enter ' + l.name + '</button></div>').join('');
+  host.innerHTML = '<p>Loading lessons...</p>';
+  try {
+      const res = await fetch(CMS_LESSONS_URL);
+      const csv = await res.text();
+      const rows = await parseCSV(csv);
+      LESSONS = [];
+      for(let i=1; i<rows.length; i++){
+          if(rows[i].length >= 3) LESSONS.push({
+              id: rows[i][0].trim(),
+              name: rows[i][1].trim(),
+              date: rows[i][2] ? rows[i][2].trim() : '',
+              tone: parseInt(rows[i][3]) || 1,
+              active: rows[i][4] ? rows[i][4].trim().toLowerCase() === 'true' : false,
+              outcomes: rows[i][5] ? rows[i][5].split('|').map(o=>o.trim()) : []
+          });
+      }
+      host.innerHTML = LESSONS.map(l => `
+          <div class="course" style="background: ${getGradient(l.tone)}; color: #fff">
+            <div class="course-date">${l.date}</div>
+            <h3>${l.name}</h3>
+            <button class="course-btn" onclick="handleLessonClick('${l.id}', ${l.active})">Enter ${l.id}</button>
+            <ul class="outcomes-list">
+                ${l.outcomes.slice(0,2).map(o => `<li>${o}</li>`).join('')}
+            </ul>
+          </div>
+      `).join('');
+  } catch(e) {
+      host.innerHTML = '<p style="color:red">Failed to load lessons from Sheet.</p>';
+  }
 }
 
-async function handleLessonClick(name, active){
+async function handleLessonClick(id, active){
   if (!localStorage.getItem('token')) { showAuth('login'); return; }
   const isAdmin = localStorage.getItem('iys_is_admin') === '1';
-  if (isAdmin) { showCourse(); return; }
+  if (isAdmin) { await loadLessonData(id); showCourse(); return; }
   try {
     const res = await fetch('/api/my-offers', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
-    if (res.ok && (await res.json()).includes(name)) { showCourse(); return; }
+    if (res.ok && (await res.json()).includes('IYS Course')) { await loadLessonData(id); showCourse(); return; }
   } catch (e) {}
-  alert('Contact the IYS team to get access to ' + name + '.');
+  alert('Contact the IYS team to get access to ' + id + '.');
+}
+
+function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); renderCourse(); history.pushState(null, '', '#course'); window.scrollTo(0,0); }
+
+async function loadLessonData(id) {
+    currentLessonId = id;
+    document.getElementById('course-content').innerHTML = '<p>Loading lesson...</p>';
+    try {
+        const res = await fetch(`/api/lesson?id=${id}`);
+        if (!res.ok) throw new Error('Lesson not found');
+        COURSE_DATA = await res.json();
+        // Group by Module for rendering
+        renderCourse();
+    } catch(e) {
+        document.getElementById('course-content').innerHTML = '<p style="color:red">Failed to load lesson data.</p>';
+    }
 }
 
 async function login() {
@@ -274,29 +328,90 @@ async function changePassword() {
   } catch (e) { errEl.innerText = 'Network error.'; }
 }
 
-function linkify(text){ return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function linkify(text){ 
+    return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" class="content-link">$1</a>');
+}
 
 function renderCourse(){
   const host = document.getElementById('course-content'); host.innerHTML = '';
-  if (COURSE_DATA.length === 0) return;
-  COURSE_DATA.forEach(mod => {
-    const section = document.createElement('section'); section.id = mod.id; section.className = 'module-section ' + mod.bg;
-    section.innerHTML = '<div class="wrap"><div class="module-header"><h2>' + mod.title + '</h2></div><div class="mod-items" id="items-' + mod.id + '"></div></div>';
-    host.appendChild(section);
-    const itemsHost = document.getElementById('items-' + mod.id);
-    mod.items.forEach(item => {
-      const div = document.createElement('div'); div.className = 'mod-item'; div.dataset.id = item.id;
-      let contentHtml = '';
-      if (item.type === 'expandable') contentHtml = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${item.title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(item.content)}</div></div></div>`;
-      else if (item.type === 'answer') contentHtml = `<h3 class="item-title">${item.title}</h3><div class="answer-box"><label>${item.question}</label><textarea class="answer-input" data-answer-id="${item.id}" oninput="triggerAutoSave()"></textarea></div>`;
-      else contentHtml = `<h3 class="item-title">${item.title}</h3><div class="mod-content">${linkify(item.content)}</div>`;
-      div.innerHTML = contentHtml; itemsHost.appendChild(div);
-    });
-    const completeDiv = document.createElement('div'); completeDiv.className = 'module-complete-check';
-    completeDiv.innerHTML = `<input type="checkbox" class="module-check" id="complete-${mod.id}" data-module-id="${mod.id}" onchange="triggerAutoSave()"><label class="module-check-label" for="complete-${mod.id}">I have completed Module ${mod.number}</label>`;
-    itemsHost.appendChild(completeDiv);
+  const linksHost = document.getElementById('module-links'); linksHost.innerHTML = '';
+  
+  if (!COURSE_DATA || COURSE_DATA.length === 0) return;
+  
+  let currentMod = 0;
+  COURSE_DATA.forEach(row => {
+      if (row.length < 4) return;
+      const id = row[0] ? row[0].trim() : '';
+      const modNum = row[1] ? parseInt(row[1].trim()) : currentMod;
+      if (modNum > currentMod) currentMod = modNum;
+      const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+      const title = row[3] ? row[3].trim() : '';
+      const content = row[4] ? row[4].trim() : '';
+      const extra1 = row[5] ? row[5].trim() : '';
+      const extra2 = row[6] ? row[6].trim() : '';
+      
+      let section = document.getElementById(`mod-section-${modNum}`);
+      if (!section) {
+          section = document.createElement('section');
+          section.id = `mod-section-${modNum}`;
+          section.className = 'module-section bg-mod-' + (modNum % 6 || 1); 
+          section.innerHTML = `<div class="wrap"><div class="mod-items" id="items-mod-${modNum}"></div></div>`;
+          host.appendChild(section);
+          linksHost.innerHTML += `<a href="#mod-section-${modNum}">Mod ${modNum}</a>`;
+      }
+      
+      const itemsHost = section.querySelector('.mod-items');
+      const div = document.createElement('div');
+      div.className = 'mod-item';
+      
+      if (type === 'module') {
+          // Module Title with Checkbox
+          div.className = 'module-header';
+          div.id = `header-${id}`;
+          div.innerHTML = `
+              <input type="checkbox" id="check-${id}" data-item-id="${id}" data-kind="module" onchange="triggerAutoSave(); toggleModuleStrike('${id}', this.checked)">
+              <h2 class="module-title">${title}</h2>
+          `;
+      } else if (type === 'expandable') {
+          div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
+      } else if (type === 'answer') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+      } else if (type === 'poll') {
+          const options = extra1 ? extra1.split('|') : [];
+          const isMulti = extra2 === 'multi';
+          const inputType = isMulti ? 'checkbox' : 'radio';
+          div.innerHTML = `
+              <h3 class="item-title">${title}</h3>
+              <div class="poll-box" data-item-id="${id}" data-kind="poll">
+                  ${options.map((opt, i) => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}
+              </div>
+          `;
+      } else if (type === 'link') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px;">${extra1 || 'Open Link'}</a>`;
+      } else if (type === 'image') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
+      } else if (type === 'bullets') {
+          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+          div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
+      } else if (type === 'numbers') {
+          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+          div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
+      } else {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+      }
+      
+      itemsHost.appendChild(div);
   });
   loadProgress();
+}
+
+function toggleModuleStrike(id, checked) {
+    const header = document.getElementById(`header-${id}`);
+    if (header) {
+        if (checked) header.classList.add('completed');
+        else header.classList.remove('completed');
+    }
 }
 
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
@@ -305,10 +420,23 @@ function setStatus(text, cls){ const el = document.getElementById('save-status')
 async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
-  document.querySelectorAll('.module-check').forEach(check => progress.push({ item_id: 'module-' + check.dataset.moduleId, completed: check.checked ? 1 : 0, type: 'module_completion' }));
-  document.querySelectorAll('.answer-input').forEach(input => progress.push({ item_id: input.dataset.answerId, note: input.value, type: 'answer' }));
+  
+  document.querySelectorAll('input[data-kind="module"]').forEach(check => {
+      progress.push({ item_id: check.dataset.itemId, completed: check.checked ? 1 : 0, kind: 'module', type: 'module_completion' });
+  });
+  
+  document.querySelectorAll('textarea[data-kind="answer"]').forEach(input => {
+      progress.push({ item_id: input.dataset.itemId, note: input.value, kind: 'answer', type: 'answer' });
+  });
+  
+  document.querySelectorAll('.poll-box').forEach(box => {
+      const itemId = box.dataset.itemId;
+      const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
+      progress.push({ item_id: itemId, options: selected, kind: 'poll', type: 'poll' });
+  });
+  
   try { 
-    const res = await fetch('/api/progress', { method:'POST', headers:{'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ progress }) }); 
+    const res = await fetch('/api/progress', { method:'POST', headers:{'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ lesson: currentLessonId, progress: progress }) }); 
     if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
   } catch (e) { setStatus('Error saving!', 'save-warn'); }
 }
@@ -319,8 +447,21 @@ async function loadProgress(){
     if (!res.ok) return; 
     const data = await res.json(); 
     data.forEach(saved => { 
-      if (saved.type === 'module_completion') { const check = document.querySelector(`#complete-${saved.item_id.replace('module-', '')}`); if (check) check.checked = saved.completed === 1; }
-      if (saved.type === 'answer') { const input = document.querySelector(`[data-answer-id="${saved.item_id}"]`); if (input) input.value = saved.note || ''; }
+      if (saved.type === 'module_completion') { 
+          const check = document.querySelector(`input[data-item-id="${saved.item_id}"]`); 
+          if (check) { check.checked = saved.completed === 1; toggleModuleStrike(saved.item_id, check.checked); }
+      }
+      if (saved.type === 'answer') { 
+          const input = document.querySelector(`textarea[data-item-id="${saved.item_id}"]`); 
+          if (input) input.value = saved.note || ''; 
+      }
+      if (saved.type === 'poll') {
+          const box = document.querySelector(`.poll-box[data-item-id="${saved.item_id}"]`);
+          if (box) {
+              // Note: We don't save poll options to DB yet, just local state if needed, 
+              // but the main save sends them to AMS. For now, we leave them blank on load.
+          }
+      }
     }); 
     setStatus('All changes saved.', ''); 
   } catch (e) {}
@@ -338,31 +479,8 @@ async function parseCSV(text) {
   if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
   return rows;
 }
-
-async function loadLessonsFromSheet() {
-  try {
-    const response = await fetch(CMS_LESSONS_URL); const rows = await parseCSV(await response.text()); LESSONS = [];
-    for (let i = 1; i < rows.length; i++) { const row = rows[i]; if (row.length >= 3) LESSONS.push({ name: row[0].trim(), tone: parseInt(row[1].trim()) || 1, active: row[2].trim().toLowerCase() === 'true' }); }
-    renderLessons();
-  } catch (error) {}
-}
-
-async function loadCourseContentFromSheet() {
-  try {
-    const response = await fetch(CMS_CONTENT_URL); const rows = await parseCSV(await response.text()); COURSE_DATA = []; let currentMod = null;
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i]; if (row.length < 4) continue;
-      const modNum = row[0] ? row[0].trim() : '1'; const itemType = row[1] ? row[1].trim().toLowerCase() : 'text'; const title = row[2] ? row[2].trim() : ''; const content = row[3] ? row[3].trim() : '';
-      if (!title) continue;
-      if (!currentMod || currentMod.id !== 'mod-' + modNum) { currentMod = { id: 'mod-' + modNum, number: modNum, title: 'Module ' + modNum, bg: 'bg-mod-' + modNum, items: [] }; COURSE_DATA.push(currentMod); }
-      currentMod.items.push({ id: title.toLowerCase().replace(/[^a-z0-9]+/g, '_'), type: itemType, title: title, content: content, question: itemType === 'answer' ? content : '' });
-    }
-    renderCourse();
-  } catch (error) {}
-}
   
-loadLessonsFromSheet(); loadCourseContentFromSheet();
-if (location.hash === '#course') showCourse(); else showHome();
+showHome();
 </script>
 </body>
 </html>
