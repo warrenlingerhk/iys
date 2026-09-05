@@ -99,12 +99,7 @@ h1,h2,h3,.brand,.stat strong{font-family:'Poppins',sans-serif}
 .note-input{width:100%;margin-top:14px;padding:14px 16px;border-radius:10px;border:2px solid var(--slate);font:inherit;min-height:90px; font-size:1rem} .note-input:focus{outline:none;border-color:var(--pink)}
 .modal-overlay{position:fixed;inset:0;background:rgba(2,62,138,.6);z-index:100;display:grid;place-items:center;padding:20px}
 .modal-box{background:#fff;border-radius:18px;padding:32px;max-width:420px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)} .modal-box h3{margin:0 0 12px;font-size:1.4rem} .modal-box p{margin:0 0 20px;color:var(--slate);font-weight:700} .modal-close{padding:10px 28px;border-radius:999px;border:none;background:var(--navy);color:#fff;font-weight:800;cursor:pointer}
-@media(max-width:900px){
-  .layout{grid-template-columns:1fr}
-  .layout > div{display:contents}
-  .hero{order:1}
-  .rail{order:2}
-}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.layout > div{display:contents}.hero{order:1}.rail{order:2}}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.hero-media{min-height:180px}}
 @media(max-width:700px){.module-menu{top:63px; padding:8px 12px; grid-template-columns:1fr; justify-items:center; row-gap:6px} .module-menu a{font-size:.85rem; padding:5px 10px} .module-menu .back-home{justify-self:center} .save-status{display:none}}
 </style>
@@ -136,7 +131,6 @@ h1,h2,h3,.brand,.stat strong{font-family:'Poppins',sans-serif}
         <div class="hero-media"></div>
       </section>
     </div>
-
     <aside class="rail" id="rail-home">
       <h2 class="rail-title">Lessons</h2>
       <div class="course-list" id="course-list-home"></div>
@@ -195,6 +189,19 @@ h1,h2,h3,.brand,.stat strong{font-family:'Poppins',sans-serif}
   </div>
 </div>
 
+<div id="change-password-modal" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-box" style="text-align:left">
+    <h3>Change Password</h3>
+    <input type="password" id="cp-current" placeholder="Current Password" style="width:100%;padding:11px 14px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px;font:inherit">
+    <input type="password" id="cp-new" placeholder="New Password (8+ characters)" style="width:100%;padding:11px 14px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px;font:inherit">
+    <p class="form-error" id="cp-error" style="text-align:center"></p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:15px">
+      <button class="btn ghost" onclick="document.getElementById('change-password-modal').classList.add('hidden')">Cancel</button>
+      <button class="btn cta" onclick="changePassword()">Update Password</button>
+    </div>
+  </div>
+</div>
+
 <footer style="background:var(--navy); color:#fff; padding:40px 0 20px; margin-top:60px; text-align:center;">
   <div class="wrap">
     <p style="margin:0 0 20px; font-size:.9rem; opacity:.8;">©2026 Influence Your Success. All rights reserved.</p>
@@ -203,11 +210,8 @@ h1,h2,h3,.brand,.stat strong{font-family:'Poppins',sans-serif}
 
 <script>
 const API_URL = '';
-// --- GOOGLE SHEETS CMS LINKS (READ-ONLY) ---
 const CMS_LESSONS_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_LESSONS_SHEET_ID/pub?gid=0&single=true&output=csv';
 const CMS_CONTENT_URL = 'https://docs.google.com/spreadsheets/d/e/YOUR_CONTENT_SHEET_ID/pub?gid=0&single=true&output=csv';
-const CMS_ANSWERS_WEBHOOK = 'https://script.google.com/macros/s/YOUR_ANSWERS_WEBHOOK_ID/exec';
-// --------------------------------------------
 
 let saveTimeout;
 let LESSONS = []; 
@@ -235,6 +239,7 @@ function renderHeader(){
     const isAdmin = localStorage.getItem('iys_is_admin') === '1';
     host.innerHTML = (isAdmin ? '<a href="/admin.html" class="btn small ghost" style="text-decoration:none;background:#fff">Admin<span id="admin-badge" class="admin-badge hidden"></span></a>' : '') +
       '<span class="name-chip" title="' + (name||'') + '">' + (name || 'Classmate') + '</span>' +
+      '<button class="btn small ghost" onclick="document.getElementById(\'change-password-modal\').classList.remove(\'hidden\')" style="background:#fff">Change PW</button>' +
       '<button class="btn small ghost" onclick="logout()" style="background:#fff">Log out</button>';
   } else {
     host.innerHTML = '<button class="btn small cta" onclick="showAuth(\'signup\')">Sign Up</button>' +
@@ -250,7 +255,7 @@ function renderLessons(){
       '<h3>' + l.name + '</h3>' +
       '<button class="course-btn" style="margin:10px 0" onclick="handleLessonClick(\'' + l.name + '\', ' + l.active + ')">Enter ' + l.name + '</button>' +
       '<div class="course-outcomes">' +
-        '<ul class="outcomes-list">' + l.outcomes.slice(0, 2).map(o => '<li>' + o + '</li>').join('') + '</ul>' +
+        '<ul class="outcomes-list">' + (l.outcomes ? l.outcomes.slice(0, 2).map(o => '<li>' + o + '</li>').join('') : '') + '</ul>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -269,7 +274,7 @@ async function handleLessonClick(name, active){
   if (active && hasAccess) { showCourse(); return; }
   alert('Contact the IYS team to get access to ' + name + '.');
 }
-function closeModal(e){ if (e.target.id === 'access-modal') e.target.classList.add('hidden'); }
+function closeModal(e){ if (e.target.classList.contains('modal-overlay')) e.target.classList.add('hidden'); }
 
 async function login() {
   const errEl = document.getElementById('login-error'); errEl.innerText = '';
@@ -309,6 +314,32 @@ async function signup() {
   } catch (e) { errEl.innerText = 'Network error — try again.'; }
 }
 
+async function changePassword() {
+  const errEl = document.getElementById('cp-error'); errEl.innerText = '';
+  const currentPassword = document.getElementById('cp-current').value;
+  const newPassword = document.getElementById('cp-new').value;
+  
+  if (!currentPassword || !newPassword) { errEl.innerText = 'Both fields are required.'; return; }
+  if (newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
+
+  try {
+    const res = await fetch(API_URL + '/api/change-password', { 
+      method:'POST', 
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, 
+      body: JSON.stringify({ currentPassword, newPassword }) 
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('change-password-modal').classList.add('hidden');
+      document.getElementById('cp-current').value = '';
+      document.getElementById('cp-new').value = '';
+      alert('Password changed successfully!');
+    } else {
+      errEl.innerText = data.error || 'Failed to change password.';
+    }
+  } catch (e) { errEl.innerText = 'Network error — try again.'; }
+}
+
 function linkify(text){
   let esc = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   esc = esc.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="content-link">$1</a>');
@@ -336,63 +367,26 @@ function renderCourse(){
       div.dataset.moduleId = mod.id;
       
       let contentHtml = '';
-      
-      // Handle different content types
       if (item.type === 'expandable') {
-        contentHtml = `
-          <div class="expandable-box">
-            <div class="expandable-header" onclick="toggleExpandable(this)">
-              <span>${item.title}</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            </div>
-            <div class="expandable-content">
-              <div class="mod-content">${linkify(item.content)}</div>
-            </div>
-          </div>
-        `;
+        contentHtml = `<div class="expandable-box"><div class="expandable-header" onclick="toggleExpandable(this)"><span>${item.title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(item.content)}</div></div></div>`;
       } else if (item.type === 'answer') {
-        contentHtml = `
-          <h3 class="item-title">${item.title}</h3>
-          <div class="mod-content">${linkify(item.instruction || '')}</div>
-          <div class="answer-box">
-            <label for="answer-${item.id}">${item.question}</label>
-            <textarea class="answer-input" id="answer-${item.id}" data-answer-id="${item.id}" placeholder="Type your answer here..." oninput="triggerAutoSave()">${item.savedAnswer || ''}</textarea>
-          </div>
-        `;
+        contentHtml = `<h3 class="item-title">${item.title}</h3><div class="mod-content">${linkify(item.instruction || '')}</div><div class="answer-box"><label for="answer-${item.id}">${item.question}</label><textarea class="answer-input" id="answer-${item.id}" data-answer-id="${item.id}" placeholder="Type your answer here..." oninput="triggerAutoSave()">${item.savedAnswer || ''}</textarea></div>`;
       } else if (item.type === 'image') {
-        contentHtml = `
-          <h3 class="item-title">${item.title}</h3>
-          <div class="mod-content">
-            <img src="${item.imageUrl}" alt="${item.alt || ''}">
-            ${item.caption ? `<p style="text-align:center; font-style:italic; color:var(--slate)">${item.caption}</p>` : ''}
-          </div>
-        `;
+        contentHtml = `<h3 class="item-title">${item.title}</h3><div class="mod-content"><img src="${item.imageUrl}" alt="${item.alt || ''}">${item.caption ? `<p style="text-align:center; font-style:italic; color:var(--slate)">${item.caption}</p>` : ''}</div>`;
       } else if (item.type === 'text-box') {
-        contentHtml = `
-          <h3 class="item-title">${item.title}</h3>
-          <div class="text-box">${linkify(item.content)}</div>
-        `;
+        contentHtml = `<h3 class="item-title">${item.title}</h3><div class="text-box">${linkify(item.content)}</div>`;
       } else {
-        contentHtml = `
-          <h3 class="item-title">${item.title}</h3>
-          <div class="mod-content">${linkify(item.content)}</div>
-        `;
+        contentHtml = `<h3 class="item-title">${item.title}</h3><div class="mod-content">${linkify(item.content)}</div>`;
       }
-      
       div.innerHTML = contentHtml;
       itemsHost.appendChild(div);
     });
     
-    // Add module completion checkbox at the end
     const completeDiv = document.createElement('div');
     completeDiv.className = 'module-complete-check';
-    completeDiv.innerHTML = `
-      <input type="checkbox" class="module-check" id="complete-${mod.id}" data-module-id="${mod.id}" onchange="triggerAutoSave()">
-      <label class="module-check-label" for="complete-${mod.id}">I have completed Module ${mod.number}</label>
-    `;
+    completeDiv.innerHTML = `<input type="checkbox" class="module-check" id="complete-${mod.id}" data-module-id="${mod.id}" onchange="triggerAutoSave()"><label class="module-check-label" for="complete-${mod.id}">I have completed Module ${mod.number}</label>`;
     itemsHost.appendChild(completeDiv);
   });
-  
   loadProgress();
 }
 
@@ -418,73 +412,39 @@ function setStatus(text, cls){
 async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
-  
-  // Save module completions
   document.querySelectorAll('.module-check').forEach(check => { 
-    progress.push({ 
-      item_id: 'module-' + check.dataset.moduleId, 
-      completed: check.checked ? 1 : 0,
-      type: 'module_completion'
-    }); 
+    progress.push({ item_id: 'module-' + check.dataset.moduleId, completed: check.checked ? 1 : 0, type: 'module_completion' }); 
   });
-  
-  // Save answers
   document.querySelectorAll('.answer-input').forEach(input => {
-    progress.push({
-      item_id: input.dataset.answerId,
-      note: input.value,
-      type: 'answer'
-    });
+    progress.push({ item_id: input.dataset.answerId, note: input.value, type: 'answer' });
   });
 
   try { 
-    const res = await fetch('/api/progress', { 
-      method:'POST', 
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
-      }, 
-      body: JSON.stringify({ progress }) 
-    }); 
+    const res = await fetch('/api/progress', { method:'POST', headers:{'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ progress }) }); 
     if (res.ok) { setStatus('All changes saved.', 'save-ok'); } 
     else { setStatus('Error saving!', 'save-err'); }
-  } catch (e) { 
-    console.error(e);
-    setStatus('Error saving!', 'save-err'); 
-  }
+  } catch (e) { setStatus('Error saving!', 'save-err'); }
 }
 
 async function loadProgress(){
   try { 
-    const res = await fetch('/api/progress', { 
-      headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} 
-    }); 
+    const res = await fetch('/api/progress', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} }); 
     if (!res.ok) { setStatus('All changes saved.', 'save-ok'); return; } 
     const data = await res.json(); 
-    
     data.forEach(saved => { 
-      // Load module completions
       if (saved.type === 'module_completion') {
         const check = document.querySelector(`#complete-${saved.item_id.replace('module-', '')}`);
-        if (check) {
-          check.checked = saved.completed === 1;
-          check.closest('.mod-item').classList.toggle('completed', saved.completed === 1);
-        }
+        if (check) { check.checked = saved.completed === 1; check.closest('.mod-item').classList.toggle('completed', saved.completed === 1); }
       }
-      // Load answers
       if (saved.type === 'answer') {
         const input = document.querySelector(`#answer-${saved.item_id}`);
         if (input) input.value = saved.note || '';
       }
     }); 
     setStatus('All changes saved.', 'save-ok'); 
-  } catch (e) { 
-    console.error(e);
-    setStatus('Error loading!', 'save-err'); 
-  }
+  } catch (e) { setStatus('Error loading!', 'save-err'); }
 }
 
-// --- GOOGLE SHEETS CMS ENGINE ----
 async function parseCSV(text) {
   const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
   for (let i = 0; i < text.length; i++) {
@@ -507,18 +467,11 @@ async function loadLessonsFromSheet() {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row.length >= 3) {
-        LESSONS.push({
-          name: row[0].trim(),
-          tone: parseInt(row[1].trim()) || 1,
-          active: row[2].trim().toLowerCase() === 'true',
-          outcomes: row[3] ? row[3].split('|').map(o => o.trim()).filter(o => o) : []
-        });
+        LESSONS.push({ name: row[0].trim(), tone: parseInt(row[1].trim()) || 1, active: row[2].trim().toLowerCase() === 'true', outcomes: row[3] ? row[3].split('|').map(o => o.trim()).filter(o => o) : [] });
       }
     }
     renderLessons();
-  } catch (error) {
-    console.error('CMS Lesson Load Error:', error);
-  }
+  } catch (error) { console.error('CMS Lesson Load Error:', error); }
 }
 
 async function loadCourseContentFromSheet() {
@@ -528,72 +481,35 @@ async function loadCourseContentFromSheet() {
     const rows = await parseCSV(csvText);
     COURSE_DATA = [];
     let currentMod = null;
-
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row.length < 4) continue;
-      
       const modNum = row[0] ? row[0].trim() : '1';
       const itemType = row[1] ? row[1].trim().toLowerCase() : 'text';
       const title = row[2] ? row[2].trim() : '';
       const content = row[3] ? row[3].trim() : '';
       const extra1 = row[4] ? row[4].trim() : '';
       const extra2 = row[5] ? row[5].trim() : '';
-
       if (!title && itemType !== 'module_header') continue;
-
       if (!currentMod || currentMod.id !== 'mod-' + modNum) {
-        currentMod = {
-          id: 'mod-' + modNum,
-          number: modNum,
-          title: 'Module ' + modNum,
-          bg: 'bg-mod-' + modNum,
-          sub: '',
-          items: []
-        };
+        currentMod = { id: 'mod-' + modNum, number: modNum, title: 'Module ' + modNum, bg: 'bg-mod-' + modNum, sub: '', items: [] };
         COURSE_DATA.push(currentMod);
       }
-
-      const item = {
-        id: title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '') || 'item-' + i,
-        type: itemType,
-        title: title
-      };
-
-      if (itemType === 'expandable') {
-        item.content = content;
-      } else if (itemType === 'answer') {
-        item.question = content;
-        item.instruction = extra1;
-      } else if (itemType === 'image') {
-        item.imageUrl = content;
-        item.alt = extra1;
-        item.caption = extra2;
-      } else if (itemType === 'text-box') {
-        item.content = content;
-      } else {
-        item.content = content;
-      }
-
+      const item = { id: title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '') || 'item-' + i, type: itemType, title: title };
+      if (itemType === 'expandable') { item.content = content; } 
+      else if (itemType === 'answer') { item.question = content; item.instruction = extra1; } 
+      else if (itemType === 'image') { item.imageUrl = content; item.alt = extra1; item.caption = extra2; } 
+      else if (itemType === 'text-box') { item.content = content; } 
+      else { item.content = content; }
       currentMod.items.push(item);
     }
-    
     renderCourse();
-  } catch (error) {
-    console.error('CMS Content Load Error:', error);
-  }
+  } catch (error) { console.error('CMS Content Load Error:', error); }
 }
   
-// Initialize
 loadLessonsFromSheet();
 loadCourseContentFromSheet();
-
-// Check URL on load
-if (location.hash.startsWith('#mod') || location.hash === '#course') {
-  showCourse();
-} else {
-  showHome();
-}
+if (location.hash.startsWith('#mod') || location.hash === '#course') { showCourse(); } else { showHome(); }
 </script>
 </body>
 </html>
