@@ -63,8 +63,8 @@ async function handleApi(request, env, ctx, url) {
   // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
-    if (!email || !password || String(password).length < 8)
-      return json({ error: 'Email and a password of 6+ characters required.' }, 400);
+  if (!email || !password || String(password).length < 8)
+    return json({ error: 'Email and a password of 8+ characters required.' }, 400);
     
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
@@ -235,6 +235,39 @@ async function handleApi(request, env, ctx, url) {
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const user = await env.DB.prepare('SELECT name, is_paid, is_admin, user_number FROM users WHERE id = ?').bind(userId).first();
     return json(user);
+  }
+
+    // --- CHANGE PASSWORD ---
+  if (path === '/api/change-password' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    
+    const { currentPassword, newPassword } = await request.json();
+    if (!currentPassword || !newPassword || String(newPassword).length < 8) {
+      return json({ error: 'New password must be at least 8 characters.' }, 400);
+    }
+
+    const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
+    if (!user || user.password !== await hashPassword(currentPassword)) {
+      return json({ error: 'Current password is incorrect.' }, 401);
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, userId).run();
+    
+    return json({ success: true, message: 'Password updated successfully.' });
+  }
+
+  // --- ADMIN RESET PASSWORD ---
+  if (path === '/api/admin/reset-password' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id, newPassword } = await request.json();
+    if (!newPassword || String(newPassword).length < 8) {
+      return json({ error: 'New password must be at least 8 characters.' }, 400);
+    }
+    const newHash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, user_id).run();
+    return json({ success: true });
   }
 
   // --- APPROVALS & NOTIFICATIONS ---
