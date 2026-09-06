@@ -109,7 +109,6 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .modal-box h3{margin:0 0 12px;font-size:1.4rem}
 .lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center}
 .lesson-title-card h1{margin:0;font-size:clamp(1.8rem,4vw,2.5rem);color:var(--navy)}
-.lesson-title-card p{margin:10px 0 0;color:var(--slate);font-weight:700}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
@@ -317,6 +316,7 @@ async function loadLessonData(id) {
         COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
     } catch(e) {
+        console.error('Lesson load error:', e);
         document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">Failed to load lesson data.</p>';
     }
 }
@@ -474,14 +474,12 @@ function renderCourse(){
   const lessonInfo = COURSE_DATA.lessonInfo;
   const lessonTone = lessonInfo ? lessonInfo.tone : 1;
   const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
-  const lessonDate = lessonInfo ? lessonInfo.date : '';
   const gradient = getGradient(lessonTone);
 
   let html = `<div style="background:${gradient};min-height:100vh;padding:40px 0">`;
   html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
   html += `<div class="lesson-title-card">`;
-  html += `<h1>${lessonName}</h1>`;
-  if (lessonDate) html += `<p>${lessonDate}</p>`;
+  html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
   html += `</div>`;
   html += `<div id="lesson-modules"></div>`;
   html += `</div></div>`;
@@ -492,25 +490,30 @@ function renderCourse(){
   const rows = COURSE_DATA;
 
   let currentMod = 0;
+  const moduleNumbers = new Set();
+  
   rows.forEach(row => {
       if (row.length < 4) return;
       const id = row[0] ? row[0].trim() : '';
       const modNum = row[1] ? parseInt(row[1].trim()) : currentMod;
-      if (modNum > currentMod) currentMod = modNum;
+      if (modNum && modNum > 0) {
+          currentMod = modNum;
+          moduleNumbers.add(modNum);
+      }
       const type = row[2] ? row[2].trim().toLowerCase() : 'text';
       const title = row[3] ? row[3].trim() : '';
       const content = row[4] ? row[4].trim() : '';
       const extra1 = row[5] ? row[5].trim() : '';
       const extra2 = row[6] ? row[6].trim() : '';
 
-      let section = document.getElementById(`mod-section-${modNum}`);
+      let section = document.getElementById(`mod-section-${currentMod}`);
       if (!section) {
           section = document.createElement('section');
-          section.id = `mod-section-${modNum}`;
+          section.id = `mod-section-${currentMod}`;
           section.className = 'module-section';
-          section.innerHTML = `<div class="mod-items" id="items-mod-${modNum}"></div>`;
+          section.innerHTML = `<div class="mod-items" id="items-mod-${currentMod}"></div>`;
           modulesHost.appendChild(section);
-          linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
+          linksHost.innerHTML += `<a href="#mod-section-${currentMod}">Module ${currentMod}</a>`;
       }
 
       const itemsHost = section.querySelector('.mod-items');
