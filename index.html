@@ -55,7 +55,6 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .auth-body .btn{width:100%;padding:11px;margin-bottom:10px}
 .form-error{color:var(--pink);font-weight:800;font-size:1rem; margin-top:8px}
 .auth-link{color:var(--pink);font-weight:800;text-decoration:none}
-/* Community */
 .community{padding:26px 28px; margin-top:28px}
 .community h2{font-size:1.5rem;margin:0 0 6px}
 .community-sub{color:var(--slate);font-weight:700;margin:0 0 16px}
@@ -76,7 +75,6 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .reply-box{margin-top:10px}
 .reply-box .btn{margin-top:8px}
 .replies{margin-top:6px}
-/* Lesson header bar */
 .module-menu{position:sticky; top:63px; z-index:40; background:var(--navy); color:#fff; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:14px 4%; border-bottom:4px solid var(--pink); width:100%;}
 .module-menu .back-home{justify-self:start; color:#fff; text-decoration:none; font-weight:800; font-size:1rem; padding:6px 16px; border-radius:999px; transition:background .2s;}
 .module-menu .back-home:hover{background:rgba(255,255,255,.15)}
@@ -85,11 +83,9 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .module-links a:hover{background:rgba(255,255,255,.15)}
 .save-status{justify-self:end; color:var(--lightBlue); font-weight:800; font-size:1rem; text-align:right;}
 .save-warn{color:var(--pink)}
-.module-section{padding:60px 0; border-bottom:4px solid var(--navy)}
-.bg-mod-1{background:var(--blue); color:#fff} .bg-mod-2{background:var(--lightBlue); color:var(--navy)} .bg-mod-3{background:var(--pink); color:#fff}
-.bg-mod-4{background:var(--navy); color:#fff} .bg-mod-5{background:var(--darkBlue); color:#fff} .bg-mod-6{background:var(--cream); color:var(--navy); border:2px solid var(--navy)}
-.module-header{margin-bottom:40px; display:flex; align-items:center; justify-content:center; gap:15px;}
-.module-header h2{font-size:clamp(2rem,5vw,3rem); font-weight:800; margin:0; transition:all 0.3s;}
+.module-section{padding:30px 0; border-bottom:4px solid var(--navy)}
+.module-header{margin-bottom:30px; display:flex; align-items:center; justify-content:center; gap:15px;}
+.module-header h2{font-size:clamp(1.5rem,4vw,2.2rem); font-weight:800; margin:0; transition:all 0.3s;}
 .module-header input[type="checkbox"]{width:32px; height:32px; accent-color:var(--pink); cursor:pointer;}
 .module-header.completed h2{text-decoration:line-through; opacity:0.5;}
 .mod-item{background:#fff; color:var(--navy); border-radius:14px; padding:24px 26px; box-shadow:0 5px 0 rgba(2,62,138,.12); margin-bottom:20px; }
@@ -111,6 +107,9 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .modal-overlay{position:fixed;inset:0;background:rgba(2,62,138,.6);z-index:100;display:grid;place-items:center;padding:20px}
 .modal-box{background:#fff;border-radius:18px;padding:32px;max-width:420px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}
 .modal-box h3{margin:0 0 12px;font-size:1.4rem}
+.lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center}
+.lesson-title-card h1{margin:0;font-size:clamp(1.8rem,4vw,2.5rem);color:var(--navy)}
+.lesson-title-card p{margin:10px 0 0;color:var(--slate);font-weight:700}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
@@ -120,7 +119,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 <header class="site-head">
   <div class="head-in wrap">
     <a class="brand" href="#" onclick="showHome();return false;">
-      <img class="brand-logo" src="/logo.svg" alt="" onerror="this.remove()">
+      <img class="brand-logo" src="/images/IYS Logo.png" alt="" onerror="this.remove()">
       <span>Influence Your <span class="brand-dot">Success</span></span>
     </a>
     <div class="head-actions" id="head-actions"></div>
@@ -219,7 +218,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 
 <script>
 const API_URL = '';
-const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs/export?format=csv&sheet=Lessons`;
+const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
+const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/${CMS_SHEET_ID}/export?format=csv&sheet=Lessons`;
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
 
 function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
@@ -254,20 +254,30 @@ function renderHeader(){
 
 async function renderLessons(){
   const host = document.getElementById('course-list-home');
-  host.innerHTML = '<p>Loading lessons...</p>';
+  host.innerHTML = '<p style="text-align:center;color:var(--slate);font-weight:700">Loading lessons...</p>';
   try {
       const res = await fetch(CMS_LESSONS_URL);
       const csv = await res.text();
       const rows = await parseCSV(csv);
       LESSONS = [];
       for(let i=1; i<rows.length; i++){
-          if(rows[i].length >= 3) LESSONS.push({
-              id: rows[i][0].trim(), name: rows[i][1].trim(),
-              date: rows[i][2] ? rows[i][2].trim() : '',
-              tone: parseInt(rows[i][3]) || 1,
-              active: rows[i][4] ? rows[i][4].trim().toLowerCase() === 'true' : false,
-              outcomes: rows[i][5] ? rows[i][5].split('|').map(o=>o.trim()) : []
+          const row = rows[i];
+          if (row.length < 5) continue;
+          const id = (row[0] || '').trim();
+          const name = (row[1] || '').trim();
+          if (!id || !name) continue;
+          LESSONS.push({
+              id: id,
+              name: name,
+              date: row[2] ? row[2].trim() : '',
+              tone: parseInt(row[3]) || 1,
+              active: (row[4] || '').trim().toLowerCase() === 'true',
+              outcomes: row[5] ? row[5].split('|').map(o=>o.trim()) : []
           });
+      }
+      if (LESSONS.length === 0) {
+          host.innerHTML = '<p style="text-align:center;color:var(--slate);font-weight:700">No lessons found in sheet.</p>';
+          return;
       }
       host.innerHTML = LESSONS.map(l => `
           <div class="course" style="background: ${getGradient(l.tone)}; color: #fff">
@@ -276,7 +286,10 @@ async function renderLessons(){
             <button class="course-btn" onclick="handleLessonClick('${l.id}', ${l.active})">Enter ${l.id}</button>
             <ul class="outcomes-list">${l.outcomes.slice(0,2).map(o => `<li>${o}</li>`).join('')}</ul>
           </div>`).join('');
-  } catch(e) { host.innerHTML = '<p style="color:red">Failed to load lessons from Sheet.</p>'; }
+  } catch(e) {
+      console.error('Lessons load error:', e);
+      host.innerHTML = '<p style="color:red;text-align:center;font-weight:700">Failed to load lessons.</p>';
+  }
 }
 
 async function handleLessonClick(id, active){
@@ -294,27 +307,20 @@ function showCourse(){ hideAllViews(); document.getElementById('view-course').cl
 
 async function loadLessonData(id) {
     currentLessonId = id;
-    document.getElementById('course-content').innerHTML = '<p style="padding:40px;text-align:center">Loading lesson...</p>';
-    
-    // Find the lesson info from the Lessons tab
     const lessonInfo = LESSONS.find(l => l.id === id);
-    if (!lessonInfo) {
-        document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">Lesson not found.</p>';
-        return;
-    }
-    
+    document.getElementById('course-content').innerHTML = '<p style="padding:40px;text-align:center">Loading lesson...</p>';
     try {
         const res = await fetch(`/api/lesson?id=${id}`);
         if (!res.ok) throw new Error('Lesson not found');
-        COURSE_DATA = await res.json();
-        COURSE_DATA.lessonInfo = lessonInfo; // Store the lesson metadata
+        const rows = await res.json();
+        COURSE_DATA = rows;
+        COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
     } catch(e) {
         document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">Failed to load lesson data.</p>';
     }
 }
 
-/* ===== COMMUNITY ===== */
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 async function renderCommunity(){
@@ -343,11 +349,11 @@ function postHtml(p, isReply){
     <div class="post-head">
       <span class="post-name">${escapeHtml(p.user_name)}</span>
       <span class="post-date">${(p.created_at||'').slice(0,10)}</span>
-      ${p.pinned ? '<span class="pin-tag"> Pinned</span>' : ''}
+      ${p.pinned ? '<span class="pin-tag">Pinned</span>' : ''}
     </div>
     <div class="post-content">${linkify(p.content)}</div>
     <div class="post-actions">
-      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : ''} ${p.like_count}</button>
+      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : '🤍'} ${p.like_count}</button>
       ${!isReply ? `<button class="post-btn" onclick="toggleReplyBox(${p.id})">Reply</button>` : ''}
       <button class="post-btn" onclick="reportPost(${p.id})">Report</button>
       ${isAdmin ? `<button class="post-btn admin" onclick="adminPin(${p.id})">${p.pinned ? 'Unpin' : 'Pin'}</button><button class="post-btn admin" onclick="adminDelete(${p.id})">Delete</button><button class="post-btn admin" onclick="adminBan(${p.author_id})">Ban</button>` : ''}
@@ -403,7 +409,6 @@ async function adminBan(userId){
   renderCommunity();
 }
 
-/* ===== AUTH ===== */
 async function login() {
   const errEl = document.getElementById('login-error'); errEl.innerText = '';
   const email = document.getElementById('login-email').value.trim();
@@ -426,10 +431,8 @@ async function signup() {
   const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
   const confirmPassword = document.getElementById('signup-password-confirm').value;
-  
   if (!name) { errEl.innerText = 'Please enter your name.'; return; }
   if (password !== confirmPassword) { errEl.innerText = 'Passwords do not match.'; return; }
-  
   try {
     const res = await fetch(API_URL + '/api/signup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, email, password }) });
     const data = await res.json();
@@ -447,11 +450,9 @@ async function changePassword() {
   const currentPassword = document.getElementById('cp-current').value;
   const newPassword = document.getElementById('cp-new').value;
   const confirmNewPassword = document.getElementById('cp-new-confirm').value;
-  
   if (!currentPassword || !newPassword) { errEl.innerText = 'All fields are required.'; return; }
   if (newPassword !== confirmNewPassword) { errEl.innerText = 'New passwords do not match.'; return; }
   if (newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
-  
   try {
     const res = await fetch(API_URL + '/api/change-password', { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ currentPassword, newPassword }) });
     const data = await res.json();
@@ -465,42 +466,89 @@ function linkify(text){
         .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" class="content-link">$1</a>');
 }
 
-/* ===== COURSE ===== */
 function renderCourse(){
-  const host = document.getElementById('course-content'); 
-  const linksHost = document.getElementById('module-links'); 
+  const host = document.getElementById('course-content');
+  const linksHost = document.getElementById('module-links');
   linksHost.innerHTML = '';
-  
-  if (!COURSE_DATA || COURSE_DATA.length === 0) {
-    host.innerHTML = '<p style="padding:40px;text-align:center">No content available for this lesson yet.</p>';
-    return;
-  }
-  
-  // Get lesson metadata
+
   const lessonInfo = COURSE_DATA.lessonInfo;
   const lessonTone = lessonInfo ? lessonInfo.tone : 1;
   const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
-  
-  // Set the background gradient for the whole page based on lesson tone
+  const lessonDate = lessonInfo ? lessonInfo.date : '';
   const gradient = getGradient(lessonTone);
-  host.style.background = gradient;
-  host.style.minHeight = '100vh';
-  host.style.padding = '40px 0';
-  
-  // Add lesson title at the top
-  let html = `
-    <div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">
-      <div style="background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1)">
-        <h1 style="margin:0;font-size:clamp(1.8rem,4vw,2.5rem);color:var(--navy);text-align:center">${lessonName}</h1>
-        ${lessonInfo && lessonInfo.date ? `<p style="margin:10px 0 0;color:var(--slate);font-weight:700;text-align:center">${lessonInfo.date}</p>` : ''}
-      </div>
-      <div id="lesson-modules"></div>
-    </div>
-  `;
-  
+
+  let html = `<div style="background:${gradient};min-height:100vh;padding:40px 0">`;
+  html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
+  html += `<div class="lesson-title-card">`;
+  html += `<h1>${lessonName}</h1>`;
+  if (lessonDate) html += `<p>${lessonDate}</p>`;
+  html += `</div>`;
+  html += `<div id="lesson-modules"></div>`;
+  html += `</div></div>`;
+
   host.innerHTML = html;
-  
+
   const modulesHost = document.getElementById('lesson-modules');
+  const rows = COURSE_DATA;
+
+  let currentMod = 0;
+  rows.forEach(row => {
+      if (row.length < 4) return;
+      const id = row[0] ? row[0].trim() : '';
+      const modNum = row[1] ? parseInt(row[1].trim()) : currentMod;
+      if (modNum > currentMod) currentMod = modNum;
+      const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+      const title = row[3] ? row[3].trim() : '';
+      const content = row[4] ? row[4].trim() : '';
+      const extra1 = row[5] ? row[5].trim() : '';
+      const extra2 = row[6] ? row[6].trim() : '';
+
+      let section = document.getElementById(`mod-section-${modNum}`);
+      if (!section) {
+          section = document.createElement('section');
+          section.id = `mod-section-${modNum}`;
+          section.className = 'module-section';
+          section.innerHTML = `<div class="mod-items" id="items-mod-${modNum}"></div>`;
+          modulesHost.appendChild(section);
+          linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
+      }
+
+      const itemsHost = section.querySelector('.mod-items');
+      const div = document.createElement('div');
+      div.className = 'mod-item';
+
+      if (type === 'module') {
+          div.className = 'module-header';
+          div.id = `header-${id}`;
+          div.innerHTML = `<input type="checkbox" id="check-${id}" data-item-id="${id}" data-kind="module" onchange="triggerAutoSave(); toggleModuleStrike('${id}', this.checked)"><h2 class="module-title">${title}</h2>`;
+      } else if (type === 'expandable') {
+          div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
+      } else if (type === 'answer') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+      } else if (type === 'poll') {
+          const options = extra1 ? extra1.split('|') : [];
+          const isMulti = extra2 === 'multi';
+          const inputType = isMulti ? 'checkbox' : 'radio';
+          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
+      } else if (type === 'link') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
+      } else if (type === 'image') {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
+      } else if (type === 'bullets') {
+          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+          div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
+      } else if (type === 'numbers') {
+          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+          div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
+      } else if (type === 'title') {
+          div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+      } else {
+          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+      }
+      itemsHost.appendChild(div);
+  });
+  loadProgress();
+}
 
 function toggleModuleStrike(id, checked) {
     const header = document.getElementById(`header-${id}`);
