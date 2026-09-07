@@ -634,7 +634,7 @@ async function saveProgress(){
 
   document.querySelectorAll('[id^="module-check-"]').forEach(check => {
     progress.push({
-      item_id: 'module-' + check.dataset.module,
+      item_id: currentLessonId + '-module-' + check.dataset.module,
       header_name: 'M' + check.dataset.module,
       format: 'module',
       type: 'module_completion',
@@ -685,8 +685,8 @@ async function loadProgress(){
     if (!res.ok) return;
     const data = await res.json();
     data.forEach(saved => {
-      if (saved.type === 'module_completion') {
-          const modNum = saved.item_id.replace('module-', '');
+      if (saved.type === 'module_completion' && saved.item_id.startsWith(currentLessonId + '-module-')) {
+          const modNum = saved.item_id.replace(currentLessonId + '-module-', '');
           const check = document.getElementById(`module-check-${modNum}`);
           if (check) check.checked = saved.completed === 1;
       }
