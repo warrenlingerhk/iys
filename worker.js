@@ -3,7 +3,7 @@
 // --- CONFIG ---
 const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
 // PASTE YOUR /exec LINK HERE ONCE YOU HAVE IT
-const AMS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby4JtopoLOxdebbwGAI9U2iZxJH7ld_ekNhVqtex4H0lyK4TvP5aZ4EMd2iFE7d_OOR/exec';
+const AMS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxgFI-PMUJr5JUPMBFMCBT_ZD_ONDwYrCWCspzZ00ndrpHxHs5hQLzhtsANrl47HPjh/exec';
 
 export default {
   async fetch(request, env, ctx) {
@@ -86,30 +86,39 @@ async function handleApi(request, env, ctx, url) {
   }
 
   // --- PROGRESS ---
-  if (path === '/api/progress') {
+  if (path === '/api/progress' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    if (method === 'GET') {
-      const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(userId).all();
-      return json(res.results);
+    
+    const body = await request.json();
+    const progress = body.progress || [];
+    const lessonId = body.lesson;
+    
+    for (const item of progress) {
+      await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+        .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer')
+        .run();
     }
-    if (method === 'POST') {
-      const body = await request.json();
-      const progress = body.progress || [];
-      const lessonId = body.lesson;
-      for (const item of progress) {
-        await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))").bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
-      }
-      if (AMS_WEBHOOK_URL && AMS_WEBHOOK_URL !== 'PASTE_YOUR_EXEC_LINK_HERE' && lessonId) {
-        const user = await env.DB.prepare('SELECT email, name, member_number FROM users WHERE id = ?').bind(userId).first();
-        ctx.waitUntil(fetch(AMS_WEBHOOK_URL, {
+    
+    if (env.AMS_WEBHOOK_URL && lessonId) {
+      const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
+      
+      ctx.waitUntil(
+        fetch(env.AMS_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ lesson: lessonId, email: user.email, name: user.name, member_number: user.member_number, progress: progress })
-        }).catch(e => console.error('AMS Sync failed', e)));
-      }
-      return json({ success: true });
+          body: JSON.stringify({
+            email: user.email,
+            name: user.name,
+            member_number: user.user_number,
+            lesson: lessonId,
+            progress: progress
+          })
+        }).catch(e => console.error('AMS Sync failed', e))
+      );
     }
+    
+    return json({ success: true });
   }
 
   // --- COMMUNITY ---
