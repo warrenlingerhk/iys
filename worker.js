@@ -1,5 +1,7 @@
 
 
+const AMS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxgFI-PMUJr5JUPMBFMCBT_ZD_ONDwYrCWCspzZ00ndrpHxHs5hQLzhtsANrl47HPjh/exec';
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -15,7 +17,6 @@ async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
-  // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
     if (!email || !password || String(password).length < 8)
@@ -35,74 +36,54 @@ async function handleApi(request, env, ctx, url) {
     const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
-    
     return json({ token, name: user.name, user_number: user.user_number, is_admin: 0 });
   }
 
   if (path === '/api/login' && method === 'POST') {
     const { email, password } = await request.json();
-    const user = await env.DB.prepare('SELECT id, password, name, user_number, is_admin, banned FROM users WHERE email = ?')
-      .bind((email || '').toLowerCase()).first();
-    
-    if (!user || user.password !== await hashPassword(password || ''))
-      return json({ error: 'Invalid email or password.' }, 401);
-    
-    if (user.banned) 
-      return json({ error: 'This account has been banned.' }, 403);
+    const user = await env.DB.prepare('SELECT id, password, name, user_number, is_admin, banned FROM users WHERE email = ?').bind((email || '').toLowerCase()).first();
+    if (!user || user.password !== await hashPassword(password || '')) return json({ error: 'Invalid email or password.' }, 401);
+    if (user.banned) return json({ error: 'This account has been banned.' }, 403);
     
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
-    
     return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin });
   }
 
-  // --- PROGRESS (ANSWERS SYNC) ---
   if (path === '/api/progress' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
     
     const body = await request.json();
     const progress = body.progress || [];
-    const lessonId = body.lesson; // L1, L2, etc.
+    const lessonId = body.lesson;
     
-    // Save to database
     for (const item of progress) {
       await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
-        .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer')
-        .run();
+        .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
     }
     
-    // Sync to Google Sheet AMS
-    if (env.AMS_WEBHOOK_URL && env.AMS_WEBHOOK_URL !== 'https://script.google.com/macros/s/AKfycbxgFI-PMUJr5JUPMBFMCBT_ZD_ONDwYrCWCspzZ00ndrpHxHs5hQLzhtsANrl47HPjh/exec' && lessonId) {
+    // FIXED: Removed the broken !== check
+    if (env.AMS_WEBHOOK_URL && env.AMS_WEBHOOK_URL !== 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE' && lessonId) {
       const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
-      
       ctx.waitUntil(
         fetch(env.AMS_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            email: user.email,
-            name: user.name,
-            member_number: user.user_number,
-            lesson: lessonId,
-            progress: progress
-          })
+          body: JSON.stringify({ email: user.email, name: user.name, member_number: user.user_number, lesson: lessonId, progress: progress })
         }).catch(e => console.error('AMS Sync failed:', e))
       );
     }
-    
     return json({ success: true });
   }
 
   if (path === '/api/progress' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    
     const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(userId).all();
     return json(res.results);
   }
 
-  // --- MY OFFERS ---
   if (path === '/api/my-offers' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -110,47 +91,12 @@ async function handleApi(request, env, ctx, url) {
     return json(res.results.map(r => r.offer));
   }
 
-  // --- LESSON CONTENT ---
-  if (path === '/api/lesson' && method === 'GET') {
-    const lessonId = url.searchParams.get('id');
-    if (!lessonId) return json({ error: 'Lesson ID required' }, 400);
-    
-    // Fetch from Google Sheet CSV
-    const sheetUrl = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs/export?format=csv&gid=0`;
-    try {
-      const res = await fetch(sheetUrl);
-      if (!res.ok) throw new Error('Failed to fetch');
-      const csv = await res.text();
-      const rows = await parseCSV(csv);
-      return json(rows);
-    } catch (e) {
-      return json({ error: 'Failed to load lesson' }, 500);
-    }
-  }
-
-  // --- COMMUNITY POSTS ---
   if (path === '/api/posts' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    
-    const posts = await env.DB.prepare(`
-      SELECT p.*, u.name as user_name, u.id as user_id,
-      (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-      (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
-      FROM posts p JOIN users u ON p.user_id = u.id 
-      WHERE p.parent_id IS NULL AND u.banned = 0
-      ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50
-    `).bind(userId).all();
-
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.banned = 0 ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(userId).all();
     for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`
-        SELECT p.*, u.name as user_name, u.id as user_id,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
-        FROM posts p JOIN users u ON p.user_id = u.id 
-        WHERE p.parent_id = ? AND u.banned = 0
-        ORDER BY p.created_at ASC
-      `).bind(userId, post.id).all();
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.banned = 0 ORDER BY p.created_at ASC`).bind(userId, post.id).all();
     }
     return json(posts.results);
   }
@@ -160,8 +106,7 @@ async function handleApi(request, env, ctx, url) {
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const { content, parent_id } = await request.json();
     if (!content) return json({ error: 'Post cannot be empty.' }, 400);
-    const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)')
-      .bind(userId, content, parent_id || null).run();
+    const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)').bind(userId, content, parent_id || null).run();
     return json({ id: res.meta.last_row_id });
   }
 
@@ -199,8 +144,7 @@ async function handleApi(request, env, ctx, url) {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const { post_id, reason } = await request.json();
-    await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)')
-      .bind(post_id, userId, reason || '').run();
+    await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)').bind(post_id, userId, reason || '').run();
     return json({ success: true });
   }
 
@@ -236,28 +180,4 @@ async function hashPassword(password) {
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-}
-
-async function parseCSV(text) {
-  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === '"') inQuotes = !inQuotes;
-    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; }
-    else if ((char === '\n' || char === '\r') && !inQuotes) { 
-      if (currentCell !== '' || currentRow.length > 0) { 
-        currentRow.push(currentCell); 
-        rows.push(currentRow); 
-      } 
-      currentRow = []; 
-      currentCell = ''; 
-      if (char === '\r' && text[i+1] === '\n') i++; 
-    }
-    else currentCell += char;
-  }
-  if (currentCell !== '' || currentRow.length > 0) { 
-    currentRow.push(currentCell); 
-    rows.push(currentRow); 
-  }
-  return rows;
 }
