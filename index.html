@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -225,7 +227,7 @@ const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2
 const LESSON_CSV_URLS = {
   'L1': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQhF94QwyTZkGkgDrjbp-WNH5Pd9xjxge0EFoFMOQk_Ycw3RkvQgKbog_1QtEUeO14vJfvfy6x9CaX9/pub?gid=105559072&single=true&output=csv',
   'L2': 'PASTE_L2_PUBLISHED_CSV_URL_HERE',
-  'L3': 'PASTE_L3_PUBLISHED_CSV_URL_HERE',
+  'L3': 'PASTE_L3_PUBLISHED_CSV_URL_HERE'
   // Add L4 through L27 here as you publish each tab
 };
 
@@ -321,20 +323,18 @@ async function loadLessonData(id) {
     
     try {
         const csvUrl = LESSON_CSV_URLS[id];
-        console.log('Loading from CSV:', csvUrl);
         
-        if (!csvUrl) {
-            document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">No CSV URL configured for ' + id + '</p>';
+        // SAFETY CHECK: If the URL is still the placeholder, show a friendly message instead of crashing
+        if (!csvUrl || csvUrl.includes('PASTE_')) {
+            document.getElementById('course-content').innerHTML = `<p style="padding:40px;text-align:center;color:var(--navy);font-weight:700">Lesson ${id} content is being prepared.<br><br>(The CSV link for ${id} needs to be added to the code.)</p>`;
             return;
         }
         
         const res = await fetch(csvUrl);
         if (!res.ok) throw new Error('Failed to load CSV');
         const csvText = await res.text();
-        console.log('CSV loaded, length:', csvText.length);
         
         const rows = await parseCSV(csvText);
-        console.log('Parsed rows:', rows.length);
         
         COURSE_DATA = rows.slice(1); // Skip header row
         COURSE_DATA.lessonInfo = lessonInfo;
@@ -512,9 +512,6 @@ function renderCourse(){
 
     const modulesHost = document.getElementById('lesson-modules');
     const rows = COURSE_DATA;
-    
-    console.log('Rendering course with', rows.length, 'rows');
-    console.log('First few rows:', rows.slice(0, 3));
 
     let currentMod = 0;
     const moduleNumbers = new Set();
@@ -562,8 +559,6 @@ function renderCourse(){
             const content = row[4] || '';
             const extra1 = row[5] || '';
             const extra2 = row[6] || '';
-            
-            console.log('Processing row:', {id, type, title});
             
             if (type === 'module') return;
             
