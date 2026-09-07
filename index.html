@@ -83,12 +83,11 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .module-links a:hover{background:rgba(255,255,255,.15)}
 .save-status{justify-self:end; color:var(--lightBlue); font-weight:800; font-size:1rem; text-align:right;}
 .save-warn{color:var(--pink)}
-.module-section{padding:30px 0; border-bottom:4px solid var(--navy)}
-.module-header{margin-bottom:30px; display:flex; align-items:center; justify-content:center; gap:15px;}
-.module-header h2{font-size:clamp(1.5rem,4vw,2.2rem); font-weight:800; margin:0; transition:all 0.3s;}
-.module-header input[type="checkbox"]{width:32px; height:32px; accent-color:var(--pink); cursor:pointer;}
-.module-header.completed h2{text-decoration:line-through; opacity:0.5;}
-.mod-item{background:#fff; color:var(--navy); border-radius:14px; padding:24px 26px; box-shadow:0 5px 0 rgba(2,62,138,.12); margin-bottom:20px; }
+.module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+.module-header{padding:40px 30px; text-align:center}
+.module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
+.mod-item{background:#fff; color:var(--navy); padding:24px 26px; margin:0; border-bottom:1px solid rgba(2,62,138,0.1)}
+.mod-item:last-child{border-bottom:none}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
 .mod-content{font-size:1.05rem;line-height:1.7}
 .expandable-box{border:2px solid var(--lightBlue); border-radius:10px; margin:12px 0; overflow:hidden}
@@ -107,8 +106,11 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .modal-overlay{position:fixed;inset:0;background:rgba(2,62,138,.6);z-index:100;display:grid;place-items:center;padding:20px}
 .modal-box{background:#fff;border-radius:18px;padding:32px;max-width:420px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}
 .modal-box h3{margin:0 0 12px;font-size:1.4rem}
-.lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center}
+.lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center; width:100%; max-width:900px; margin-left:auto; margin-right:auto}
 .lesson-title-card h1{margin:0;font-size:clamp(1.8rem,4vw,2.5rem);color:var(--navy)}
+.module-check-container{padding:20px 30px; display:flex; align-items:center; justify-content:center; gap:12px; background:rgba(255,255,255,0.3)}
+.module-check-container input{width:28px; height:28px; accent-color:var(--pink); cursor:pointer}
+.module-check-container label{font-weight:800; font-size:1.1rem; cursor:pointer; color:#fff}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
@@ -219,6 +221,10 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 const API_URL = '';
 const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
 const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/${CMS_SHEET_ID}/export?format=csv&sheet=Lessons`;
+const LESSON_CSV_URLS = {
+  'L1': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSeIjIJrUEmFEpAVd4X9Z-ovV-kJlhDbp_ZjfJNtbyeXA-WibbLQ9_fp3kmyFRVEUt2qYgAAtUtvXM2/pub?gid=105559072&single=true&output=csv'
+};
+
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
 
 function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
@@ -228,13 +234,13 @@ function logout(){ localStorage.clear(); showHome(); }
 
 function getGradient(tone) {
     if (tone >= 1 && tone <= 23) {
-        const startHue = 190 + (tone * 3);
-        const endHue = startHue + 20;
-        return `linear-gradient(135deg, hsl(${startHue}, 75%, 55%) 0%, hsl(${endHue}, 80%, 60%) 100%)`;
+        const startHue = 180 + ((tone - 1) * 4);
+        const endHue = startHue + 40;
+        return `linear-gradient(135deg, hsl(${startHue}, 85%, 50%) 0%, hsl(${endHue}, 90%, 45%) 100%)`;
     } else {
-        const startHue = 300 + ((tone - 24) * 8);
-        const endHue = startHue + 30;
-        return `linear-gradient(135deg, hsl(${startHue}, 80%, 55%) 0%, hsl(${endHue}, 85%, 60%) 100%)`;
+        const startHue = 300 + ((tone - 24) * 15);
+        const endHue = startHue + 40;
+        return `linear-gradient(135deg, hsl(${startHue}, 90%, 55%) 0%, hsl(${endHue}, 95%, 50%) 100%)`;
     }
 }
 
@@ -308,11 +314,19 @@ async function loadLessonData(id) {
     currentLessonId = id;
     const lessonInfo = LESSONS.find(l => l.id === id);
     document.getElementById('course-content').innerHTML = '<p style="padding:40px;text-align:center">Loading lesson...</p>';
+    
     try {
-        const res = await fetch(`/api/lesson?id=${id}`);
+        const csvUrl = LESSON_CSV_URLS[id];
+        if (!csvUrl) {
+            document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">No CSV URL configured for ' + id + '</p>';
+            return;
+        }
+        
+        const res = await fetch(csvUrl);
         if (!res.ok) throw new Error('Lesson not found');
-        const rows = await res.json();
-        COURSE_DATA = rows;
+        const csv = await res.text();
+        const rows = await parseCSV(csv);
+        COURSE_DATA = rows.slice(1);
         COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
     } catch(e) {
@@ -476,7 +490,7 @@ function renderCourse(){
   const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
   const gradient = getGradient(lessonTone);
 
-  let html = `<div style="background:${gradient};min-height:100vh;padding:40px 0">`;
+  let html = `<div style="min-height:100vh;padding:40px 0; background:var(--cream)">`;
   html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
   html += `<div class="lesson-title-card">`;
   html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
@@ -491,71 +505,85 @@ function renderCourse(){
 
   let currentMod = 0;
   const moduleNumbers = new Set();
+  const modules = {};
   
   rows.forEach(row => {
       if (row.length < 4) return;
-      const id = row[0] ? row[0].trim() : '';
-      const modNum = row[1] ? parseInt(row[1].trim()) : currentMod;
+      const modNum = row[1] ? parseInt(row[1].trim()) : 1;
       if (modNum && modNum > 0) {
           currentMod = modNum;
           moduleNumbers.add(modNum);
+          if (!modules[modNum]) modules[modNum] = [];
+          modules[modNum].push(row);
       }
-      const type = row[2] ? row[2].trim().toLowerCase() : 'text';
-      const title = row[3] ? row[3].trim() : '';
-      const content = row[4] ? row[4].trim() : '';
-      const extra1 = row[5] ? row[5].trim() : '';
-      const extra2 = row[6] ? row[6].trim() : '';
-
-      let section = document.getElementById(`mod-section-${currentMod}`);
-      if (!section) {
-          section = document.createElement('section');
-          section.id = `mod-section-${currentMod}`;
-          section.className = 'module-section';
-          section.innerHTML = `<div class="mod-items" id="items-mod-${currentMod}"></div>`;
-          modulesHost.appendChild(section);
-          linksHost.innerHTML += `<a href="#mod-section-${currentMod}">Module ${currentMod}</a>`;
-      }
-
-      const itemsHost = section.querySelector('.mod-items');
-      const div = document.createElement('div');
-      div.className = 'mod-item';
-
-      if (type === 'module') {
-          div.className = 'module-header';
-          div.id = `header-${id}`;
-          div.innerHTML = `<input type="checkbox" id="check-${id}" data-item-id="${id}" data-kind="module" onchange="triggerAutoSave(); toggleModuleStrike('${id}', this.checked)"><h2 class="module-title">${title}</h2>`;
-      } else if (type === 'expandable') {
-          div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
-      } else if (type === 'answer') {
-          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
-      } else if (type === 'poll') {
-          const options = extra1 ? extra1.split('|') : [];
-          const isMulti = extra2 === 'multi';
-          const inputType = isMulti ? 'checkbox' : 'radio';
-          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
-      } else if (type === 'link') {
-          div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
-      } else if (type === 'image') {
-          div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
-      } else if (type === 'bullets') {
-          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
-          div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
-      } else if (type === 'numbers') {
-          const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
-          div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
-      } else if (type === 'title') {
-          div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-      } else {
-          div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-      }
-      itemsHost.appendChild(div);
   });
-  loadProgress();
-}
 
-function toggleModuleStrike(id, checked) {
-    const header = document.getElementById(`header-${id}`);
-    if (header) { header.classList.toggle('completed', checked); }
+  Array.from(moduleNumbers).sort((a,b) => a-b).forEach(modNum => {
+      const section = document.createElement('section');
+      section.id = `mod-section-${modNum}`;
+      section.className = 'module-section';
+      section.style.background = gradient;
+      
+      const moduleItems = modules[modNum];
+      
+      section.innerHTML = `
+        <div class="module-header">
+          <h2>Module ${modNum}</h2>
+        </div>
+        <div class="mod-items" id="items-mod-${modNum}"></div>
+        <div class="module-check-container">
+          <input type="checkbox" id="module-check-${modNum}" data-module="${modNum}" onchange="triggerAutoSave()">
+          <label for="module-check-${modNum}">Mark Module ${modNum} as Complete</label>
+        </div>
+      `;
+      
+      modulesHost.appendChild(section);
+      linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
+      
+      const itemsHost = section.querySelector('.mod-items');
+      
+      moduleItems.forEach(row => {
+          const id = row[0] || '';
+          const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+          const title = row[3] || '';
+          const content = row[4] || '';
+          const extra1 = row[5] || '';
+          const extra2 = row[6] || '';
+          
+          if (type === 'module') return;
+          
+          const div = document.createElement('div');
+          div.className = 'mod-item';
+          
+          if (type === 'expandable') {
+              div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
+          } else if (type === 'answer') {
+              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+          } else if (type === 'poll') {
+              const options = extra1 ? extra1.split('|') : [];
+              const isMulti = extra2 === 'multi';
+              const inputType = isMulti ? 'checkbox' : 'radio';
+              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
+          } else if (type === 'link') {
+              div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
+          } else if (type === 'image') {
+              div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
+          } else if (type === 'bullets') {
+              const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+              div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
+          } else if (type === 'numbers') {
+              const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+              div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
+          } else if (type === 'title') {
+              div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+          } else {
+              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+          }
+          itemsHost.appendChild(div);
+      });
+  });
+  
+  loadProgress();
 }
 
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
@@ -564,10 +592,7 @@ function setStatus(text, cls){ const el = document.getElementById('save-status')
 async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
-  document.querySelectorAll('input[data-kind="module"]').forEach(check => {
-      progress.push({ item_id: check.dataset.itemId, completed: check.checked ? 1 : 0, kind: 'module', type: 'module_completion' });
-  });
-  document.querySelectorAll('textarea[data-kind="answer"]').forEach(input => {
+  document.querySelectorAll('input[data-kind="answer"]').forEach(input => {
       progress.push({ item_id: input.dataset.itemId, note: input.value, kind: 'answer', type: 'answer' });
   });
   document.querySelectorAll('.poll-box').forEach(box => {
@@ -575,6 +600,10 @@ async function saveProgress(){
       const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
       progress.push({ item_id: itemId, options: selected, kind: 'poll', type: 'poll' });
   });
+  document.querySelectorAll('[id^="module-check-"]').forEach(check => {
+      progress.push({ item_id: 'module-' + check.dataset.module, completed: check.checked ? 1 : 0, kind: 'module', type: 'module_completion' });
+  });
+  
   try {
     const res = await fetch('/api/progress', { method:'POST', headers:{'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ lesson: currentLessonId, progress: progress }) });
     if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
@@ -588,8 +617,9 @@ async function loadProgress(){
     const data = await res.json();
     data.forEach(saved => {
       if (saved.type === 'module_completion') {
-          const check = document.querySelector(`input[data-item-id="${saved.item_id}"]`);
-          if (check) { check.checked = saved.completed === 1; toggleModuleStrike(saved.item_id, check.checked); }
+          const modNum = saved.item_id.replace('module-', '');
+          const check = document.getElementById(`module-check-${modNum}`);
+          if (check) check.checked = saved.completed === 1;
       }
       if (saved.type === 'answer') {
           const input = document.querySelector(`textarea[data-item-id="${saved.item_id}"]`);
