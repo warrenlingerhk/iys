@@ -1,7 +1,5 @@
 
 
-const AMS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxgFI-PMUJr5JUPMBFMCBT_ZD_ONDwYrCWCspzZ00ndrpHxHs5hQLzhtsANrl47HPjh/exec';
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -21,18 +19,12 @@ async function handleApi(request, env, ctx, url) {
     const { name, email, password } = await request.json();
     if (!email || !password || String(password).length < 8)
       return json({ error: 'Email and password (8+ chars) required.' }, 400);
-    
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
     const nextUserNumber = Math.max(101, (maxUser.max_num || 0) + 1);
-    
     try {
-      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, created_at) VALUES (?, ?, ?, ?, datetime('now'))")
-        .bind(email.toLowerCase(), hash, name, nextUserNumber).run();
-    } catch (e) { 
-      return json({ error: 'That email is already registered.' }, 409); 
-    }
-    
+      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, created_at) VALUES (?, ?, ?, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
+    } catch (e) { return json({ error: 'That email is already registered.' }, 409); }
     const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
@@ -44,44 +36,43 @@ async function handleApi(request, env, ctx, url) {
     const user = await env.DB.prepare('SELECT id, password, name, user_number, is_admin, banned FROM users WHERE email = ?').bind((email || '').toLowerCase()).first();
     if (!user || user.password !== await hashPassword(password || '')) return json({ error: 'Invalid email or password.' }, 401);
     if (user.banned) return json({ error: 'This account has been banned.' }, 403);
-    
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
     return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin });
   }
 
-  if (path === '/api/progress' && method === 'POST') {
+  if (path === '/api/change-password' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    
-    const body = await request.json();
-    const progress = body.progress || [];
-    const lessonId = body.lesson;
-    
-    for (const item of progress) {
-      await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
-        .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
-    }
-    
-    // FIXED: Removed the broken !== check
-    if (env.AMS_WEBHOOK_URL && env.AMS_WEBHOOK_URL !== 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE' && lessonId) {
-      const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
-      ctx.waitUntil(
-        fetch(env.AMS_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ email: user.email, name: user.name, member_number: user.user_number, lesson: lessonId, progress: progress })
-        }).catch(e => console.error('AMS Sync failed:', e))
-      );
-    }
+    const { currentPassword, newPassword } = await request.json();
+    const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
+    if (!user || user.password !== await hashPassword(currentPassword || '')) return json({ error: 'Current password is incorrect.' }, 400);
+    if (!newPassword || String(newPassword).length < 8) return json({ error: 'New password must be 8+ characters.' }, 400);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(await hashPassword(newPassword), userId).run();
     return json({ success: true });
   }
 
-  if (path === '/api/progress' && method === 'GET') {
+  if (path === '/api/progress') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(userId).all();
-    return json(res.results);
+
+    if (method === 'GET') {
+      const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(userId).all();
+      return json(res.results);
+    }
+
+    if (method === 'POST') {
+      const { progress, lesson } = await request.json();
+      for (const item of (progress || [])) {
+        await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+          .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
+      }
+      if (env.AMS_WEBHOOK_URL && lesson) {
+        const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
+        ctx.waitUntil(syncSheet(env.AMS_WEBHOOK_URL, user.email, user.name, user.user_number, lesson, progress || []));
+      }
+      return json({ success: true });
+    }
   }
 
   if (path === '/api/my-offers' && method === 'GET') {
@@ -94,9 +85,23 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/posts' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.banned = 0 ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(userId).all();
+    const posts = await env.DB.prepare(`
+      SELECT p.*, u.name as user_name, u.id as user_id,
+      (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
+      (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
+      FROM posts p JOIN users u ON p.user_id = u.id
+      WHERE p.parent_id IS NULL AND u.banned = 0
+      ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50
+    `).bind(userId).all();
     for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.banned = 0 ORDER BY p.created_at ASC`).bind(userId, post.id).all();
+      post.replies = await env.DB.prepare(`
+        SELECT p.*, u.name as user_name, u.id as user_id,
+        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count,
+        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked
+        FROM posts p JOIN users u ON p.user_id = u.id
+        WHERE p.parent_id = ? AND u.banned = 0
+        ORDER BY p.created_at ASC
+      `).bind(userId, post.id).all();
     }
     return json(posts.results);
   }
@@ -180,4 +185,14 @@ async function hashPassword(password) {
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+async function syncSheet(webhookUrl, email, name, user_number, lesson, progress) {
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ email, name, user_number, lesson, progress })
+    });
+  } catch (e) { console.error('AMS sync failed:', e); }
 }
