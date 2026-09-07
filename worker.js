@@ -15,6 +15,20 @@ async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
+  if (path === '/api/sync-test' && method === 'GET') {
+    if (!env.AMS_WEBHOOK_URL) return json({ var: 'MISSING - add AMS_WEBHOOK_URL under [vars] in wrangler.toml' });
+    const gRes = await fetch(env.AMS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        email: 'synctest@iys.test', name: 'Sync Test', user_number: '000', lesson: 'L1',
+        progress: [{ item_id: 'sync-test', header_name: 'M1', format: 'module', completed: 1, note: '' }]
+      })
+    });
+    const t = await gRes.text();
+    return json({ var: 'set', status: gRes.status, google: t });
+  }
+
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
     if (!email || !password || String(password).length < 8)
@@ -67,7 +81,7 @@ async function handleApi(request, env, ctx, url) {
         await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
           .bind(userId, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
       }
-      if (env.AMS_WEBHOOK_URL && lesson) {
+      if (env.AMS_WEBHOOK_URL) {
         const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(userId).first();
         ctx.waitUntil(syncSheet(env.AMS_WEBHOOK_URL, user.email, user.name, user.user_number, lesson, progress || []));
       }
