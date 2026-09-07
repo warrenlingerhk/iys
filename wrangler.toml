@@ -10,7 +10,7 @@ binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
-database_name = iys-db"
+database_name = "iys-db"
 database_id = "183d0310-04cb-42c8-9040-c031cf68297a"
 
 [vars]
