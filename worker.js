@@ -51,7 +51,7 @@ async function handleApi(request, env, ctx, url) {
       return json({ error: 'Email and password (8+ chars) required.' }, 400);
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
-    const nextUserNumber = Math.max(101, (maxUser.max_num || 0) + 1);
+    const nextUserNumber = Math.max(102, (maxUser.max_num || 0) + 1);
     try {
       await env.DB.prepare("INSERT INTO users (email, password, name, user_number, created_at) VALUES (?, ?, ?, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
     } catch (e) { return json({ error: 'That email is already registered.' }, 409); }
