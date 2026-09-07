@@ -219,10 +219,16 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 
 <script>
 const API_URL = '';
-const CMS_SHEET_ID = '1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs';
-const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/${CMS_SHEET_ID}/export?format=csv&sheet=Lessons`;
+
+// 1. Original sheet: Lessons tab (names, dates, tones)
+const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs/export?format=csv&sheet=Lessons`;
+
+// 2. New sheet: Individual lesson content (L1, L2, etc.)
 const LESSON_CSV_URLS = {
-  'L1': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSeIjIJrUEmFEpAVd4X9Z-ovV-kJlhDbp_ZjfJNtbyeXA-WibbLQ9_fp3kmyFRVEUt2qYgAAtUtvXM2/pub?gid=105559072&single=true&output=csv'
+  'L1': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQhF94QwyTZkGkgDrjbp-WNH5Pd9xjxge0EFoFMOQk_Ycw3RkvQgKbog_1QtEUeO14vJfvfy6x9CaX9/pub?gid=105559072&single=true&output=csv',
+  'L2': 'PASTE_L2_PUBLISHED_CSV_URL_HERE',
+  'L3': 'PASTE_L3_PUBLISHED_CSV_URL_HERE',
+  // Add L4 through L27 here as you publish each tab
 };
 
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
@@ -317,21 +323,27 @@ async function loadLessonData(id) {
     
     try {
         const csvUrl = LESSON_CSV_URLS[id];
+        console.log('Loading from CSV:', csvUrl);
+        
         if (!csvUrl) {
             document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">No CSV URL configured for ' + id + '</p>';
             return;
         }
         
         const res = await fetch(csvUrl);
-        if (!res.ok) throw new Error('Lesson not found');
-        const csv = await res.text();
-        const rows = await parseCSV(csv);
-        COURSE_DATA = rows.slice(1);
+        if (!res.ok) throw new Error('Failed to load CSV');
+        const csvText = await res.text();
+        console.log('CSV loaded, length:', csvText.length);
+        
+        const rows = await parseCSV(csvText);
+        console.log('Parsed rows:', rows.length);
+        
+        COURSE_DATA = rows.slice(1); // Skip header row
         COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
     } catch(e) {
         console.error('Lesson load error:', e);
-        document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">Failed to load lesson data.</p>';
+        document.getElementById('course-content').innerHTML = '<p style="color:red;padding:40px;text-align:center">Failed to load: ' + e.message + '</p>';
     }
 }
 
@@ -481,109 +493,114 @@ function linkify(text){
 }
 
 function renderCourse(){
-  const host = document.getElementById('course-content');
-  const linksHost = document.getElementById('module-links');
-  linksHost.innerHTML = '';
+    const host = document.getElementById('course-content');
+    const linksHost = document.getElementById('module-links');
+    linksHost.innerHTML = '';
 
-  const lessonInfo = COURSE_DATA.lessonInfo;
-  const lessonTone = lessonInfo ? lessonInfo.tone : 1;
-  const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
-  const gradient = getGradient(lessonTone);
+    const lessonInfo = COURSE_DATA.lessonInfo;
+    const lessonTone = lessonInfo ? lessonInfo.tone : 1;
+    const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
+    const gradient = getGradient(lessonTone);
 
-  let html = `<div style="min-height:100vh;padding:40px 0; background:var(--cream)">`;
-  html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
-  html += `<div class="lesson-title-card">`;
-  html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
-  html += `</div>`;
-  html += `<div id="lesson-modules"></div>`;
-  html += `</div></div>`;
+    let html = `<div style="min-height:100vh;padding:40px 0; background:var(--cream)">`;
+    html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
+    html += `<div class="lesson-title-card">`;
+    html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
+    html += `</div>`;
+    html += `<div id="lesson-modules"></div>`;
+    html += `</div></div>`;
 
-  host.innerHTML = html;
+    host.innerHTML = html;
 
-  const modulesHost = document.getElementById('lesson-modules');
-  const rows = COURSE_DATA;
+    const modulesHost = document.getElementById('lesson-modules');
+    const rows = COURSE_DATA;
+    
+    console.log('Rendering course with', rows.length, 'rows');
+    console.log('First few rows:', rows.slice(0, 3));
 
-  let currentMod = 0;
-  const moduleNumbers = new Set();
-  const modules = {};
-  
-  rows.forEach(row => {
-      if (row.length < 4) return;
-      const modNum = row[1] ? parseInt(row[1].trim()) : 1;
-      if (modNum && modNum > 0) {
-          currentMod = modNum;
-          moduleNumbers.add(modNum);
-          if (!modules[modNum]) modules[modNum] = [];
-          modules[modNum].push(row);
-      }
-  });
+    let currentMod = 0;
+    const moduleNumbers = new Set();
+    const modules = {};
+    
+    rows.forEach(row => {
+        if (row.length < 4) return;
+        const modNum = row[1] ? parseInt(row[1].trim()) : 1;
+        if (modNum && modNum > 0) {
+            currentMod = modNum;
+            moduleNumbers.add(modNum);
+            if (!modules[modNum]) modules[modNum] = [];
+            modules[modNum].push(row);
+        }
+    });
 
-  Array.from(moduleNumbers).sort((a,b) => a-b).forEach(modNum => {
-      const section = document.createElement('section');
-      section.id = `mod-section-${modNum}`;
-      section.className = 'module-section';
-      section.style.background = gradient;
-      
-      const moduleItems = modules[modNum];
-      
-      section.innerHTML = `
-        <div class="module-header">
-          <h2>Module ${modNum}</h2>
-        </div>
-        <div class="mod-items" id="items-mod-${modNum}"></div>
-        <div class="module-check-container">
-          <input type="checkbox" id="module-check-${modNum}" data-module="${modNum}" onchange="triggerAutoSave()">
-          <label for="module-check-${modNum}">Mark Module ${modNum} as Complete</label>
-        </div>
-      `;
-      
-      modulesHost.appendChild(section);
-      linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
-      
-      const itemsHost = section.querySelector('.mod-items');
-      
-      moduleItems.forEach(row => {
-          const id = row[0] || '';
-          const type = row[2] ? row[2].trim().toLowerCase() : 'text';
-          const title = row[3] || '';
-          const content = row[4] || '';
-          const extra1 = row[5] || '';
-          const extra2 = row[6] || '';
-          
-          if (type === 'module') return;
-          
-          const div = document.createElement('div');
-          div.className = 'mod-item';
-          
-          if (type === 'expandable') {
-              div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
-          } else if (type === 'answer') {
-              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
-          } else if (type === 'poll') {
-              const options = extra1 ? extra1.split('|') : [];
-              const isMulti = extra2 === 'multi';
-              const inputType = isMulti ? 'checkbox' : 'radio';
-              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
-          } else if (type === 'link') {
-              div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
-          } else if (type === 'image') {
-              div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
-          } else if (type === 'bullets') {
-              const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
-              div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
-          } else if (type === 'numbers') {
-              const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
-              div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
-          } else if (type === 'title') {
-              div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-          } else {
-              div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-          }
-          itemsHost.appendChild(div);
-      });
-  });
-  
-  loadProgress();
+    Array.from(moduleNumbers).sort((a,b) => a-b).forEach(modNum => {
+        const section = document.createElement('section');
+        section.id = `mod-section-${modNum}`;
+        section.className = 'module-section';
+        section.style.background = gradient;
+        
+        const moduleItems = modules[modNum];
+        
+        section.innerHTML = `
+            <div class="module-header">
+                <h2>Module ${modNum}</h2>
+            </div>
+            <div class="mod-items" id="items-mod-${modNum}"></div>
+            <div class="module-check-container">
+                <input type="checkbox" id="module-check-${modNum}" data-module="${modNum}" onchange="triggerAutoSave()">
+                <label for="module-check-${modNum}">Mark Module ${modNum} as Complete</label>
+            </div>
+        `;
+        
+        modulesHost.appendChild(section);
+        linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
+        
+        const itemsHost = section.querySelector('.mod-items');
+        
+        moduleItems.forEach(row => {
+            const id = row[0] || '';
+            const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+            const title = row[3] || '';
+            const content = row[4] || '';
+            const extra1 = row[5] || '';
+            const extra2 = row[6] || '';
+            
+            console.log('Processing row:', {id, type, title});
+            
+            if (type === 'module') return;
+            
+            const div = document.createElement('div');
+            div.className = 'mod-item';
+            
+            if (type === 'expandable') {
+                div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
+            } else if (type === 'answer') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+            } else if (type === 'poll') {
+                const options = extra1 ? extra1.split('|') : [];
+                const isMulti = extra2 === 'multi';
+                const inputType = isMulti ? 'checkbox' : 'radio';
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
+            } else if (type === 'link') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
+            } else if (type === 'image') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
+            } else if (type === 'bullets') {
+                const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+                div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
+            } else if (type === 'numbers') {
+                const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+                div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
+            } else if (type === 'title') {
+                div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+            } else {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+            }
+            itemsHost.appendChild(div);
+        });
+    });
+    
+    loadProgress();
 }
 
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
