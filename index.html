@@ -75,7 +75,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .reply-box{margin-top:10px}
 .reply-box .btn{margin-top:8px}
 .replies{margin-top:6px}
-.module-menu{position:sticky; top:63px; z-index:40; background:var(--navy); color:#fff; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:14px 20px; border-bottom:4px solid var(--pink); width:min(860px, calc(100% - 40px)); margin-inline:auto;}.module-menu .back-home{justify-self:start; color:#fff; text-decoration:none; font-weight:800; font-size:1rem; padding:6px 16px; border-radius:999px; transition:background .2s;}
+.module-menu{position:sticky; top:63px; z-index:40; background:var(--navy); color:#fff; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:14px 20px; border-bottom:4px solid var(--pink); width:min(1150px,94%); margin-inline:auto;}
 .module-menu .back-home:hover{background:rgba(255,255,255,.15)}
 .module-links{display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:center}
 .module-links a{color:#fff; text-decoration:none; font-weight:800; font-size:.95rem; padding:6px 14px; border-radius:999px; transition:background .2s; white-space:nowrap;}
@@ -105,7 +105,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .modal-overlay{position:fixed;inset:0;background:rgba(2,62,138,.6);z-index:100;display:grid;place-items:center;padding:20px}
 .modal-box{background:#fff;border-radius:18px;padding:32px;max-width:420px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}
 .modal-box h3{margin:0 0 12px;font-size:1.4rem}
-.lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center; width:100%; max-width:900px; margin-left:auto; margin-right:auto}
+.lesson-title-card{background:#fff;border-radius:16px;padding:30px;margin-bottom:30px;box-shadow:0 8px 24px rgba(0,0,0,0.1);text-align:center; width:100%}
 .lesson-title-card h1{margin:0;font-size:clamp(1.8rem,4vw,2.5rem);color:var(--navy)}
 .module-check-container{padding:20px 30px; display:flex; align-items:center; justify-content:center; gap:12px; background:rgba(255,255,255,0.3)}
 .module-check-container input{width:28px; height:28px; accent-color:var(--pink); cursor:pointer}
@@ -525,7 +525,7 @@ function renderCourse(){
     const gradient = getGradient(lessonTone);
 
     let html = `<div style="min-height:100vh;padding:40px 0; background:var(--cream)">`;
-    html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
+    html += `<div class="wrap">`;
     html += `<div class="lesson-title-card">`;
     html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
     html += `</div>`;
