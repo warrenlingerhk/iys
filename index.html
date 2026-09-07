@@ -559,18 +559,50 @@ function renderCourse(){
         section.className = 'module-section';
         section.style.background = gradient;
         
-        const moduleItems = modules[modNum];
-        
-        section.innerHTML = `
-            <div class="module-header">
-                <h2>Module ${modNum}</h2>
-            </div>
-            <div class="mod-items" id="items-mod-${modNum}"></div>
-            <div class="module-check-container">
-                <input type="checkbox" id="module-check-${modNum}" data-module="${modNum}" onchange="triggerAutoSave()">
-                <label for="module-check-${modNum}">Mark Module ${modNum} as Complete</label>
-            </div>
-        `;
+        moduleItems.forEach(row => {
+            const rawId = (row[0] || '').trim();
+            const type = (row[2] || '').trim().toLowerCase() || 'text';
+            const title = (row[3] || '').trim();
+            const content = (row[4] || '').trim();
+            const extra1 = (row[5] || '').trim();
+            const extra2 = (row[6] || '').trim();
+
+            if (type === 'module') return;
+
+            const stableId = rawId || (currentLessonId + '-m' + modNum + '-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, ''));
+
+            const div = document.createElement('div');
+            div.className = 'mod-item';
+            div.dataset.id = stableId;
+            div.dataset.header = title;
+            div.dataset.format = type;
+
+            if (type === 'expandable') {
+                div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${linkify(content)}</div></div></div>`;
+            } else if (type === 'answer') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${stableId}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+            } else if (type === 'poll') {
+                const options = extra1 ? extra1.split('|') : [];
+                const isMulti = extra2 === 'multi';
+                const inputType = isMulti ? 'checkbox' : 'radio';
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${stableId}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${stableId}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
+            } else if (type === 'link') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
+            } else if (type === 'image') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
+            } else if (type === 'bullets' || type === 'bulllets') {
+                const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+                div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
+            } else if (type === 'numbers') {
+                const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+                div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
+            } else if (type === 'title') {
+                div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+            } else {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+            }
+            itemsHost.appendChild(div);
+        });
         
         modulesHost.appendChild(section);
         linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
@@ -627,20 +659,50 @@ function setStatus(text, cls){ const el = document.getElementById('save-status')
 async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
-  document.querySelectorAll('input[data-kind="answer"]').forEach(input => {
-      progress.push({ item_id: input.dataset.itemId, note: input.value, kind: 'answer', type: 'answer' });
-  });
-  document.querySelectorAll('.poll-box').forEach(box => {
-      const itemId = box.dataset.itemId;
-      const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
-      progress.push({ item_id: itemId, options: selected, kind: 'poll', type: 'poll' });
-  });
+
   document.querySelectorAll('[id^="module-check-"]').forEach(check => {
-      progress.push({ item_id: 'module-' + check.dataset.module, completed: check.checked ? 1 : 0, kind: 'module', type: 'module_completion' });
+    progress.push({
+      item_id: 'module-' + check.dataset.module,
+      header_name: 'M' + check.dataset.module,
+      format: 'module',
+      type: 'module_completion',
+      completed: check.checked ? 1 : 0,
+      note: ''
+    });
   });
-  
+
+  document.querySelectorAll('.mod-item[data-format="answer"]').forEach(item => {
+    const noteEl = item.querySelector('textarea[data-kind="answer"]');
+    progress.push({
+      item_id: item.dataset.id,
+      header_name: item.dataset.header,
+      format: 'answer',
+      type: 'answer',
+      completed: 0,
+      note: noteEl ? noteEl.value : ''
+    });
+  });
+
+  document.querySelectorAll('.mod-item[data-format="poll"]').forEach(item => {
+    const box = item.querySelector('.poll-box');
+    if (!box) return;
+    const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
+    progress.push({
+      item_id: item.dataset.id,
+      header_name: item.dataset.header,
+      format: 'poll',
+      type: 'poll',
+      completed: 0,
+      note: selected.join('|')
+    });
+  });
+
   try {
-    const res = await fetch('/api/progress', { method:'POST', headers:{'Content-Type':'application/json','Authorization': 'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ lesson: currentLessonId, progress: progress }) });
+    const res = await fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      body: JSON.stringify({ lesson: currentLessonId, progress: progress })
+    });
     if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
   } catch (e) { setStatus('Error saving!', 'save-warn'); }
 }
