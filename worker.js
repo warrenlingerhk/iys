@@ -15,6 +15,22 @@ async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
+  if (path === '/api/migrate' && method === 'GET') {
+    const results = [];
+    const statements = [
+      "ALTER TABLE users ADD COLUMN user_number INTEGER",
+      "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
+      "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
+      "CREATE TABLE IF NOT EXISTS offer_access (user_id INTEGER, offer TEXT, PRIMARY KEY(user_id, offer))"
+    ];
+    for (const s of statements) {
+      try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
+      catch (e) { results.push('already there: ' + s); }
+    }
+    return json({ results });
+  }
+
   if (path === '/api/sync-test' && method === 'GET') {
     if (!env.AMS_WEBHOOK_URL) return json({ var: 'MISSING - add AMS_WEBHOOK_URL under [vars] in wrangler.toml' });
     const gRes = await fetch(env.AMS_WEBHOOK_URL, {
