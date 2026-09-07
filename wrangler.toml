@@ -14,4 +14,4 @@ database_name = iys-db"
 database_id = "183d0310-04cb-42c8-9040-c031cf68297a"
 
 [vars]
-AMS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxgFI-PMUJr5JUPMBFMCBT_ZD_ONDwYrCWCspzZ00ndrpHxHs5hQLzhtsANrl47HPjh/exec"
+AMS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxyCPzu-OHaY3_RdqUWKCyb53PDb4bpJb8O8hjMuCCaQheriNK811NXJ09BPz6sf8Vx/exec"
