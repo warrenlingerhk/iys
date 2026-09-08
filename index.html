@@ -400,7 +400,7 @@ function postHtml(p, isReply){
     </div>
     <div class="post-content">${linkify(p.content)}</div>
     <div class="post-actions">
-      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : '🤍'} ${p.like_count}</button>
+      <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : ''} ${p.like_count}</button>
       ${!isReply ? `<button class="post-btn" onclick="toggleReplyBox(${p.id})">Reply</button>` : ''}
       <button class="post-btn" onclick="reportPost(${p.id})">Report</button>
       ${isAdmin ? `<button class="post-btn admin" onclick="adminPin(${p.id})">${p.pinned ? 'Unpin' : 'Pin'}</button><button class="post-btn admin" onclick="adminDelete(${p.id})">Delete</button><button class="post-btn admin" onclick="adminBan(${p.author_id})">Ban</button>` : ''}
@@ -578,15 +578,15 @@ function renderCourse(){
         moduleItems.forEach(row => {
             const id = row[0] || '';
             const type = row[2] ? row[2].trim().toLowerCase() : 'text';
-            let title = (row[3] || '').trim();
-            if (type === 'module') title = 'Module ' + modNum;
+            let title = row[3] || '';
             const content = row[4] || '';
             const extra1 = row[5] || '';
             const extra2 = row[6] || '';
             
-            if (type === 'text' && title.toLowerCase() === 'topic description') title = modDisplay;
-            
-            if (type === 'module') return;
+            if (type === 'module') {
+                title = 'Module ' + modNum;
+                return;
+            }
             
             const div = document.createElement('div');
             div.className = 'mod-item';
@@ -596,7 +596,7 @@ function renderCourse(){
                 const innerHtml = bullets.length
                     ? `<ul style="margin-left:20px; list-style:disc; margin-bottom:6px;">${bullets.map(b => `<li style="margin-bottom:6px;">${linkify(b)}</li>`).join('')}</ul>`
                     : (content ? `<div class="mod-content">${linkify(content)}</div>` : '');
-                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>More information on ${modDisplay}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
+                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>More information on ${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
