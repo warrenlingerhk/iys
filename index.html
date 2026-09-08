@@ -593,12 +593,12 @@ function renderCourse(){
             div.dataset.header = title;
             div.dataset.format = type;
 
-            if (type === 'expandable') {
+              if (type === 'expandable') {
                 const bullets = content.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
                 const innerHtml = bullets.length
                     ? `<ul style="margin-left:20px; list-style:disc; margin-bottom:6px;">${bullets.map(b => `<li style="margin-bottom:6px;">${linkify(b)}</li>`).join('')}</ul>`
                     : (content ? `<div class="mod-content">${linkify(content)}</div>` : '');
-                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>Full explanation</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
+                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>Full explanation</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${stableId}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
