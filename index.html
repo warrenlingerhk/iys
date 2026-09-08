@@ -76,6 +76,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .reply-box .btn{margin-top:8px}
 .replies{margin-top:6px}
 .module-menu{position:sticky; top:63px; z-index:40; background:var(--navy); color:#fff; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:14px 20px; border-bottom:4px solid var(--pink); width:min(1150px,94%); margin-inline:auto;}
+.module-menu .back-home{justify-self:start; color:#fff; text-decoration:none; font-weight:800; font-size:1rem; padding:6px 16px; border-radius:999px; transition:background .2s;}
 .module-menu .back-home:hover{background:rgba(255,255,255,.15)}
 .module-links{display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:center}
 .module-links a{color:#fff; text-decoration:none; font-weight:800; font-size:.95rem; padding:6px 14px; border-radius:999px; transition:background .2s; white-space:nowrap;}
@@ -224,7 +225,6 @@ const API_URL = '';
 const CMS_LESSONS_URL = `https://docs.google.com/spreadsheets/d/1qKokdpkUosrOl_2iJM_lYLmynpXigyvlgdN-ajPmGcs/export?format=csv&sheet=Lessons`;
 
 // 2. New sheet: Individual lesson content (L1, L2, etc.)
-// Keep this part exactly as is
 const LESSON_CSV_URLS = {
   'L1': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQcL3gQ4OUtD7hyOqwCSkS0WwYdmjMRYZxkyWMvJjzImfufF1vFAqSlR4lyBUQ9DiLaS12VNpwASdB8/pub?output=csv',
   'L2': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTRnkPdrBhZmiSkecFMqC4og__-afRbkB0TH20_4dc9mgu6F7nFyMijxUmUCsP8_1HpbeKcyDlSADQ4/pub?output=csv',
@@ -253,7 +253,6 @@ const LESSON_CSV_URLS = {
   'L25': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTSO_EG-Z7QChi7pPYqbaJU-2uhcirKkQc23uiosL_YKZhqcJzlqYsdOGBUgT2nx4xJDrFPKXvxJmxd/pub?output=csv',
   'L26': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQIZvWlflNJOgsQAFlBzQTDnIitW9LR7vRHCuzHmgfI1IvQ_aL4c54zJfWqG81lsg-Lp3SkID2032GD/pub?output=csv',
   'L27': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5iBQhYuXYN18eLhU22rpNUm8JjF8N7U8lF9DjxlzT6q2Lk02tT1CWmV6Bxe60u_jHyau0iAPDTaKD/pub?output=csv',
-  // Add L4 through L27 as you create them
 };
 
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
@@ -349,7 +348,6 @@ async function loadLessonData(id) {
     try {
         const csvUrl = LESSON_CSV_URLS[id];
         
-        // SAFETY CHECK: If the URL is still the placeholder, show a friendly message instead of crashing
         if (!csvUrl || csvUrl.includes('PASTE_')) {
             document.getElementById('course-content').innerHTML = `<p style="padding:40px;text-align:center;color:var(--navy);font-weight:700">Lesson ${id} content is being prepared.<br><br>(The CSV link for ${id} needs to be added to the code.)</p>`;
             return;
@@ -361,7 +359,7 @@ async function loadLessonData(id) {
         
         const rows = await parseCSV(csvText);
         
-        COURSE_DATA = rows.slice(1); // Skip header row
+        COURSE_DATA = rows.slice(1);
         COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
     } catch(e) {
@@ -526,7 +524,7 @@ function renderCourse(){
     const gradient = getGradient(lessonTone);
 
     let html = `<div style="min-height:100vh;padding:40px 0; background:var(--cream)">`;
-    html += `<div class="wrap">`;
+    html += `<div class="wrap" style="max-width:900px;margin:0 auto;padding:0 20px">`;
     html += `<div class="lesson-title-card">`;
     html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
     html += `</div>`;
@@ -541,7 +539,7 @@ function renderCourse(){
     let currentMod = 0;
     const moduleNumbers = new Set();
     const modules = {};
-
+    
     rows.forEach(row => {
         if (row.length < 4) return;
         const modNum = row[1] ? parseInt(row[1].trim()) : 1;
@@ -558,10 +556,17 @@ function renderCourse(){
         section.id = `mod-section-${modNum}`;
         section.className = 'module-section';
         section.style.background = gradient;
-
+        
+        const moduleItems = modules[modNum];
+        const modRow = moduleItems.find(r => (r[2] || '').trim().toLowerCase() === 'module');
+        const modTitle = modRow ? (modRow[3] || '').trim() : '';
+        const modSub = modRow ? (modRow[5] || '').trim() : '';
+        const modDisplay = modTitle || ('Module ' + modNum);
+        
         section.innerHTML = `
             <div class="module-header">
-                <h2>Module ${modNum}</h2>
+                <h2>${modTitle || ('Module ' + modNum)}</h2>
+                ${modSub ? `<p style="margin:10px 0 0;font-size:1.1rem;font-weight:700;opacity:.95;">${linkify(modSub)}</p>` : ''}
             </div>
             <div class="mod-items" id="items-mod-${modNum}"></div>
             <div class="module-check-container">
@@ -569,33 +574,28 @@ function renderCourse(){
                 <label for="module-check-${modNum}">Mark Module ${modNum} as Complete</label>
             </div>
         `;
-
+        
         modulesHost.appendChild(section);
         linksHost.innerHTML += `<a href="#mod-section-${modNum}">Module ${modNum}</a>`;
-
+        
         const itemsHost = section.querySelector('.mod-items');
-        const moduleItems = modules[modNum];
-
+        
         moduleItems.forEach(row => {
-            const rawId = (row[0] || '').trim();
-            const type = (row[2] || '').trim().toLowerCase() || 'text';
-            let title = (row[3] || '').trim();
+            const id = row[0] || '';
+            const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+            let title = row[3] || '';
+            const content = row[4] || '';
+            const extra1 = row[5] || '';
+            const extra2 = row[6] || '';
+            
             if (type === 'text' && title.toLowerCase() === 'topic description') title = modDisplay;
-            const content = (row[4] || '').trim();
-            const extra1 = (row[5] || '').trim();
-            const extra2 = (row[6] || '').trim();
-
+            
             if (type === 'module') return;
-
-            const stableId = rawId || (currentLessonId + '-m' + modNum + '-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, ''));
-
+            
             const div = document.createElement('div');
             div.className = 'mod-item';
-            div.dataset.id = stableId;
-            div.dataset.header = title;
-            div.dataset.format = type;
-
-              if (type === 'expandable') {
+            
+            if (type === 'expandable') {
                 const bullets = content.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
                 const innerHtml = bullets.length
                     ? `<ul style="margin-left:20px; list-style:disc; margin-bottom:6px;">${bullets.map(b => `<li style="margin-bottom:6px;">${linkify(b)}</li>`).join('')}</ul>`
@@ -603,18 +603,18 @@ function renderCourse(){
                 const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>More information on ${modDisplay}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${stableId}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
             } else if (type === 'poll') {
                 const options = extra1 ? extra1.split('|') : [];
                 const isMulti = extra2 === 'multi';
                 const inputType = isMulti ? 'checkbox' : 'radio';
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${stableId}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${stableId}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt}" onchange="triggerAutoSave()"> ${opt}</label>`).join('')}</div>`;
             } else if (type === 'link') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
             } else if (type === 'image') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
             } else if (type === 'bullets' || type === 'bulllets') {
-                const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
+                const items = content.split(/\n|\|/).map(line => `<li>${linkify(line)}</li>`).join('');
                 div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
             } else if (type === 'numbers') {
                 const items = content.split('\n').map(line => `<li>${linkify(line)}</li>`).join('');
@@ -627,7 +627,7 @@ function renderCourse(){
             itemsHost.appendChild(div);
         });
     });
-
+    
     loadProgress();
 }
 
@@ -677,8 +677,8 @@ async function saveProgress(){
 
   try {
     const res = await fetch('/api/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
       body: JSON.stringify({ lesson: currentLessonId, progress: progress })
     });
     if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
