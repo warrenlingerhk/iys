@@ -88,7 +88,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .mod-item{background:#fff; color:var(--navy); padding:24px 26px; margin:0; border-bottom:1px solid rgba(2,62,138,0.1)}
 .mod-item:last-child{border-bottom:none}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
-.mod-content{font-size:1.05rem;line-height:1.7}
+.mod-content{font-size:1.15rem;line-height:1.7}
+.expandable-content ul,.expandable-content li,.expandable-content p{font-size:1.15rem;line-height:1.7}
 .expandable-box{border:2px solid var(--lightBlue); border-radius:10px; margin:12px 0; overflow:hidden}
 .expandable-header{background:var(--lightBlue); color:var(--navy); padding:14px 18px; font-weight:800; cursor:pointer; display:flex; justify-content:space-between; align-items:center}
 .expandable-header:hover{background:var(--blue); color:#fff}
@@ -578,7 +579,8 @@ function renderCourse(){
         moduleItems.forEach(row => {
             const rawId = (row[0] || '').trim();
             const type = (row[2] || '').trim().toLowerCase() || 'text';
-            const title = (row[3] || '').trim();
+            let title = (row[3] || '').trim();
+            if (type === 'text' && title.toLowerCase() === 'topic description') title = modDisplay;
             const content = (row[4] || '').trim();
             const extra1 = (row[5] || '').trim();
             const extra2 = (row[6] || '').trim();
@@ -598,7 +600,7 @@ function renderCourse(){
                 const innerHtml = bullets.length
                     ? `<ul style="margin-left:20px; list-style:disc; margin-bottom:6px;">${bullets.map(b => `<li style="margin-bottom:6px;">${linkify(b)}</li>`).join('')}</ul>`
                     : (content ? `<div class="mod-content">${linkify(content)}</div>` : '');
-                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>Full explanation</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
+                const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>More information on ${modDisplay}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${stableId}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
