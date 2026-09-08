@@ -558,15 +558,10 @@ function renderCourse(){
         section.style.background = gradient;
         
         const moduleItems = modules[modNum];
-        const modRow = moduleItems.find(r => (r[2] || '').trim().toLowerCase() === 'module');
-        const modTitle = modRow ? (modRow[3] || '').trim() : '';
-        const modSub = modRow ? (modRow[5] || '').trim() : '';
-        const modDisplay = modTitle || ('Module ' + modNum);
         
         section.innerHTML = `
             <div class="module-header">
-                <h2>${modTitle || ('Module ' + modNum)}</h2>
-                ${modSub ? `<p style="margin:10px 0 0;font-size:1.1rem;font-weight:700;opacity:.95;">${linkify(modSub)}</p>` : ''}
+                <h2>Module ${modNum}</h2>
             </div>
             <div class="mod-items" id="items-mod-${modNum}"></div>
             <div class="module-check-container">
@@ -583,7 +578,8 @@ function renderCourse(){
         moduleItems.forEach(row => {
             const id = row[0] || '';
             const type = row[2] ? row[2].trim().toLowerCase() : 'text';
-            let title = row[3] || '';
+            let title = (row[3] || '').trim();
+            if (type === 'module') title = 'Module ' + modNum;
             const content = row[4] || '';
             const extra1 = row[5] || '';
             const extra2 = row[6] || '';
