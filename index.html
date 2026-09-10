@@ -575,7 +575,7 @@ function renderCourse(){
 
         const itemsHost = section.querySelector('.mod-items');
 
-        moduleItems.forEach(row => {
+moduleItems.forEach(row => {
             const type = row[2] ? row[2].trim().toLowerCase() : 'text';
             let title = row[3] || '';
             const content = row[4] || '';
@@ -586,14 +586,14 @@ function renderCourse(){
 
             if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
 
-            // Fallback: Use Column A if present, otherwise use Question Title
-            const id = (row[0] && row[0].trim()) ? row[0].trim() : title.trim();
+            // PitchCamp's exact ID slugifier (+ currentLessonId)
+            const id = (currentLessonId + '_' + title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
             const div = document.createElement('div');
             div.className = 'mod-item';
-            div.dataset.format = type;
             div.dataset.id = id;
             div.dataset.header = title;
+            div.dataset.format = type;
 
             if (type === 'expandable') {
                 const bullets = content.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
@@ -603,12 +603,12 @@ function renderCourse(){
                 const nested = extra1 ? `<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>More information on ${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="mod-content">${extra1.split(/\n|\|/).map(p => `<p style="margin-bottom:10px;">${linkify(p)}</p>`).join('')}</div></div></div>` : '';
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" data-item-id="${id}" data-kind="answer" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
             } else if (type === 'poll') {
                 const options = extra1 ? extra1.split('|') : [];
                 const isMulti = extra2 === 'multi';
                 const inputType = isMulti ? 'checkbox' : 'radio';
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box" data-item-id="${id}" data-kind="poll">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt.trim()}" onchange="triggerAutoSave()"> ${opt.trim()}</label>`).join('')}</div>`;
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="poll-box">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt.trim()}" onchange="triggerAutoSave()"> ${opt.trim()}</label>`).join('')}</div>`;
             } else if (type === 'link') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
             } else if (type === 'image') {
@@ -626,6 +626,7 @@ function renderCourse(){
             }
             itemsHost.appendChild(div);
         });
+      
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
 function setStatus(text, cls){ const el = document.getElementById('save-status'); el.innerText = text; el.className = 'save-status ' + (cls || ''); }
 
@@ -633,10 +634,10 @@ async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
 
-  // 1. Module completion checkboxes
+  // Module completion checkboxes
   document.querySelectorAll('[id^="module-check-"]').forEach(check => {
     progress.push({
-      item_id: currentLessonId + '-module-' + check.dataset.module,
+      item_id: (currentLessonId + '_module_' + check.dataset.module).toLowerCase(),
       header_name: 'M' + check.dataset.module,
       format: 'module',
       type: 'module_completion',
@@ -644,6 +645,42 @@ async function saveProgress(){
       note: ''
     });
   });
+
+  // Items (Answers and Polls)
+  document.querySelectorAll('.mod-item').forEach(item => {
+    const format = item.dataset.format;
+    if (format === 'answer') {
+      const noteEl = item.querySelector('.answer-input');
+      progress.push({
+        item_id: item.dataset.id,
+        header_name: item.dataset.header,
+        format: 'answer',
+        type: 'answer',
+        completed: 0,
+        note: noteEl ? noteEl.value : ''
+      });
+    } else if (format === 'poll') {
+      const selected = Array.from(item.querySelectorAll('input:checked')).map(i => i.value);
+      progress.push({
+        item_id: item.dataset.id,
+        header_name: item.dataset.header,
+        format: 'poll',
+        type: 'poll',
+        completed: 0,
+        note: selected.join('|')
+      });
+    }
+  });
+
+  try {
+    const res = await fetch('/api/progress', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      body: JSON.stringify({ lesson: currentLessonId, progress: progress })
+    });
+    if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
+  } catch (e) { setStatus('Error saving!', 'save-warn'); }
+}
 
   // 2. Textarea answers
   document.querySelectorAll('textarea.answer-input').forEach(input => {
@@ -693,31 +730,29 @@ async function loadProgress(){
     const data = await res.json();
     if (!Array.isArray(data)) return;
 
-    // 1. Restore module checkboxes
-    document.querySelectorAll('[id^="module-check-"]').forEach(check => {
-      const targetId = currentLessonId + '-module-' + check.dataset.module;
-      const match = data.find(s => s.item_id === targetId);
-      if (match) check.checked = match.completed === 1;
-    });
-
-    // 2. Restore text answers (Direct JS match — immune to spaces & question marks)
-    document.querySelectorAll('textarea.answer-input').forEach(input => {
-      const myId = input.getAttribute('data-item-id');
-      const match = data.find(s => s.item_id === myId);
-      if (match && match.note !== undefined) {
-        input.value = match.note;
+    data.forEach(saved => {
+      // 1. Restore module checkboxes
+      if (saved.type === 'module_completion') {
+        const prefix = (currentLessonId + '_module_').toLowerCase();
+        if (saved.item_id.startsWith(prefix)) {
+          const modNum = saved.item_id.replace(prefix, '');
+          const check = document.getElementById(`module-check-${modNum}`);
+          if (check) check.checked = saved.completed === 1;
+        }
       }
-    });
 
-    // 3. Restore poll choices
-    document.querySelectorAll('.poll-box').forEach(box => {
-      const myId = box.getAttribute('data-item-id');
-      const match = data.find(s => s.item_id === myId);
-      if (match && match.note) {
-        const selected = match.note.split('|');
-        box.querySelectorAll('input').forEach(inp => {
-          inp.checked = selected.includes(inp.value);
-        });
+      // 2. Restore items by data-id (PitchCamp style)
+      const item = document.querySelector('.mod-item[data-id="' + saved.item_id + '"]');
+      if (item) {
+        if (saved.type === 'answer') {
+          const noteEl = item.querySelector('.answer-input');
+          if (noteEl) noteEl.value = saved.note || '';
+        } else if (saved.type === 'poll') {
+          const selected = (saved.note || '').split('|');
+          item.querySelectorAll('input').forEach(inp => {
+            inp.checked = selected.includes(inp.value);
+          });
+        }
       }
     });
 
@@ -726,7 +761,7 @@ async function loadProgress(){
     console.error('Error loading progress:', e);
   }
 }
-
+  
 async function parseCSV(text) {
   const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
   for (let i = 0; i < text.length; i++) {
