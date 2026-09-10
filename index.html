@@ -633,6 +633,7 @@ async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
 
+  // 1. Module completion checkboxes
   document.querySelectorAll('[id^="module-check-"]').forEach(check => {
     progress.push({
       item_id: currentLessonId + '-module-' + check.dataset.module,
@@ -644,25 +645,30 @@ async function saveProgress(){
     });
   });
 
-  document.querySelectorAll('.mod-item[data-format="answer"]').forEach(item => {
-    const noteEl = item.querySelector('textarea[data-kind="answer"]');
+  // 2. Textarea answers
+  document.querySelectorAll('textarea.answer-input').forEach(input => {
+    const parentItem = input.closest('.mod-item');
+    const itemId = input.getAttribute('data-item-id');
+    const header = parentItem ? parentItem.dataset.header : itemId;
     progress.push({
-      item_id: item.dataset.id,
-      header_name: item.dataset.header,
+      item_id: itemId,
+      header_name: header,
       format: 'answer',
       type: 'answer',
       completed: 0,
-      note: noteEl ? noteEl.value : ''
+      note: input.value
     });
   });
 
-  document.querySelectorAll('.mod-item[data-format="poll"]').forEach(item => {
-    const box = item.querySelector('.poll-box');
-    if (!box) return;
+  // 3. Poll responses
+  document.querySelectorAll('.poll-box').forEach(box => {
+    const parentItem = box.closest('.mod-item');
+    const itemId = box.getAttribute('data-item-id');
+    const header = parentItem ? parentItem.dataset.header : itemId;
     const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
     progress.push({
-      item_id: item.dataset.id,
-      header_name: item.dataset.header,
+      item_id: itemId,
+      header_name: header,
       format: 'poll',
       type: 'poll',
       completed: 0,
@@ -685,26 +691,36 @@ async function loadProgress(){
     const res = await fetch('/api/progress', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
     if (!res.ok) return;
     const data = await res.json();
-    data.forEach(saved => {
-      if (saved.type === 'module_completion' && saved.item_id.startsWith(currentLessonId + '-module-')) {
-          const modNum = saved.item_id.replace(currentLessonId + '-module-', '');
-          const check = document.getElementById(`module-check-${modNum}`);
-          if (check) check.checked = saved.completed === 1;
-      }
-      if (saved.type === 'answer') {
-          const input = document.querySelector(`textarea[data-item-id="${CSS.escape(saved.item_id)}"]`);
-          if (input) input.value = saved.note || '';
-      }
-      if (saved.type === 'poll') {
-          const selected = (saved.note || '').split('|');
-          const box = document.querySelector(`.poll-box[data-item-id="${CSS.escape(saved.item_id)}"]`);
-          if (box) {
-            box.querySelectorAll('input').forEach(inp => {
-              inp.checked = selected.includes(inp.value);
-            });
-          }
+    if (!Array.isArray(data)) return;
+
+    // 1. Restore module checkboxes
+    document.querySelectorAll('[id^="module-check-"]').forEach(check => {
+      const targetId = currentLessonId + '-module-' + check.dataset.module;
+      const match = data.find(s => s.item_id === targetId);
+      if (match) check.checked = match.completed === 1;
+    });
+
+    // 2. Restore text answers (Direct JS match — immune to spaces & question marks)
+    document.querySelectorAll('textarea.answer-input').forEach(input => {
+      const myId = input.getAttribute('data-item-id');
+      const match = data.find(s => s.item_id === myId);
+      if (match && match.note !== undefined) {
+        input.value = match.note;
       }
     });
+
+    // 3. Restore poll choices
+    document.querySelectorAll('.poll-box').forEach(box => {
+      const myId = box.getAttribute('data-item-id');
+      const match = data.find(s => s.item_id === myId);
+      if (match && match.note) {
+        const selected = match.note.split('|');
+        box.querySelectorAll('input').forEach(inp => {
+          inp.checked = selected.includes(inp.value);
+        });
+      }
+    });
+
     setStatus('All changes saved.', '');
   } catch (e) {
     console.error('Error loading progress:', e);
