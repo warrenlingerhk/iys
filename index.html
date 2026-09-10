@@ -587,8 +587,11 @@ function renderCourse(){
 
             if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
 
-            const div = document.createElement('div');
-            div.className = 'mod-item';
+                const div = document.createElement('div');
+                div.className = 'mod-item';
+                div.dataset.format = type;
+                div.dataset.id = id;
+                div.dataset.header = title;
 
             if (type === 'expandable') {
                 const bullets = content.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
