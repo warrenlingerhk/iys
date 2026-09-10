@@ -219,10 +219,15 @@ function json(data, status = 200) {
 
 async function syncSheet(webhookUrl, email, name, user_number, lesson, progress) {
   try {
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ email, name, user_number, lesson, progress })
+      body: JSON.stringify({ email, name, user_number, lesson, progress }),
+      redirect: 'follow'
     });
-  } catch (e) { console.error('AMS sync failed:', e); }
+    const text = await res.text();
+    console.log('AMS sync response:', text);
+  } catch (e) { 
+    console.error('AMS sync failed:', e); 
+  }
 }
