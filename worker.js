@@ -15,14 +15,17 @@ async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
+  // --- MIGRATIONS & SYNC TEST ---
   if (path === '/api/migrate' && method === 'GET') {
     const results = [];
     const statements = [
       "ALTER TABLE users ADD COLUMN user_number INTEGER",
       "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN is_paid INTEGER DEFAULT 0",
       "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
-      "CREATE TABLE IF NOT EXISTS offer_access (user_id INTEGER, offer TEXT, PRIMARY KEY(user_id, offer))"
+      "CREATE TABLE IF NOT EXISTS offer_access (user_id INTEGER, offer TEXT, PRIMARY KEY(user_id, offer))",
+      "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
     ];
     for (const s of statements) {
       try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
@@ -45,15 +48,16 @@ async function handleApi(request, env, ctx, url) {
     return json({ var: 'set', status: gRes.status, google: t });
   }
 
+  // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
     if (!email || !password || String(password).length < 8)
       return json({ error: 'Email and password (8+ chars) required.' }, 400);
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
-    const nextUserNumber = Math.max(102, (maxUser.max_num || 0) + 1);
+    const nextUserNumber = Math.max(102, (maxUser?.max_num || 0) + 1);
     try {
-      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, created_at) VALUES (?, ?, ?, ?, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
+      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, is_paid, created_at) VALUES (?, ?, ?, ?, 0, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
     } catch (e) { return json({ error: 'That email is already registered.' }, 409); }
     const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
     const token = crypto.randomUUID();
@@ -82,6 +86,7 @@ async function handleApi(request, env, ctx, url) {
     return json({ success: true });
   }
 
+  // --- PROGRESS ---
   if (path === '/api/progress') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
@@ -105,6 +110,7 @@ async function handleApi(request, env, ctx, url) {
     }
   }
 
+  // --- MY OFFERS ---
   if (path === '/api/my-offers' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -112,6 +118,7 @@ async function handleApi(request, env, ctx, url) {
     return json(res.results.map(r => r.offer));
   }
 
+  // --- COMMUNITY ---
   if (path === '/api/posts' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
@@ -146,30 +153,24 @@ async function handleApi(request, env, ctx, url) {
   }
 
   if (path === '/api/posts/delete' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Admin only.' }, 403);
     const { post_id } = await request.json();
     await env.DB.prepare('DELETE FROM posts WHERE id = ? OR parent_id = ?').bind(post_id, post_id).run();
     return json({ success: true });
   }
 
   if (path === '/api/posts/pin' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Admin only.' }, 403);
     const { post_id } = await request.json();
     await env.DB.prepare('UPDATE posts SET pinned = NOT pinned WHERE id = ?').bind(post_id).run();
     return json({ success: true });
   }
 
   if (path === '/api/users/ban' && method === 'POST') {
-    const userId = await auth(request, env);
-    if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(userId).first();
-    if (!user || !user.is_admin) return json({ error: 'Admin only.' }, 403);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Admin only.' }, 403);
     const { user_id } = await request.json();
     await env.DB.prepare('UPDATE users SET banned = 1 WHERE id = ?').bind(user_id).run();
     return json({ success: true });
@@ -196,38 +197,60 @@ async function handleApi(request, env, ctx, url) {
     }
   }
 
-  return json({ error: 'Not found.' }, 404);
-}
-
-async function auth(request, env) {
-  const header = request.headers.get('Authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return null;
-  const s = await env.DB.prepare('SELECT user_id FROM sessions WHERE token = ?').bind(token).first();
-  return s ? s.user_id : null;
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-}
-
-async function syncSheet(webhookUrl, email, name, user_number, lesson, progress) {
-  try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ email, name, user_number, lesson, progress }),
-      redirect: 'follow'
-    });
-    const text = await res.text();
-    console.log('AMS sync response:', text);
-  } catch (e) { 
-    console.error('AMS sync failed:', e); 
+  // ==========================================
+  // --- ADMIN DASHBOARD ROUTES (RESTORED) ---
+  // ==========================================
+  if (path === '/api/admin/stats' && method === 'GET') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
+    const posts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
+    const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
+    const mod1 = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE completed = 1 AND (item_id LIKE '%module-1' OR item_id LIKE '%module_1%')").first();
+    return json({ users: users?.c || 0, posts: posts?.c || 0, reports: reports?.c || 0, mod1: mod1?.c || 0 });
   }
-}
+
+  if (path === '/api/admin/pending' && method === 'GET') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const res = await env.DB.prepare("SELECT id, name, email, user_number as member_number, created_at FROM users WHERE (is_paid = 0 OR is_paid IS NULL) AND banned = 0 ORDER BY created_at ASC").all();
+    return json(res.results);
+  }
+
+  if (path === '/api/admin/approve' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id } = await request.json();
+    await env.DB.prepare('UPDATE users SET is_paid = 1 WHERE id = ?').bind(user_id).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO offer_access (user_id, offer) VALUES (?, 'IYS Course')").bind(user_id).run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/admin/analytics' && method === 'GET') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const totalUsers = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
+    const activeLearners = await env.DB.prepare('SELECT COUNT(DISTINCT user_id) as c FROM progress').first();
+    const totalCount = totalUsers?.c || 0;
+    const activeCount = activeLearners?.c || 0;
+    const rate = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
+    return json({ totalUsers: totalCount, activeLearners: activeCount, eliteRate: rate });
+  }
+
+  if (path === '/api/admin/users' && method === 'GET') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const res = await env.DB.prepare('SELECT id, name, email, user_number as member_number, is_admin, created_at FROM users ORDER BY user_number ASC').all();
+    return json(res.results);
+  }
+
+  if (path === '/api/admin/set-admin' && method === 'POST') {
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const { user_id, is_admin } = await request.json();
+    if (Number(user_id) === Number(adminId) && !is_admin) return json({ error: 'You cannot remove your own admin status.' }, 400);
+    await env.DB.prepare('UPDATE users SET is_admin = ? WHERE id = ?').bind(is_admin ? 1 : 0, user_id).run();
+    return json({ success: true });
+  }
+
+  if (path === '/api/admin/reset-password' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id, new_password } = await request.json();
+    if (!new_password || String(new_password).length < 8) return json({ error: 'Password must be 8+ characters.' }, 400);
+    const hash = await hashPassword(new_password);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').b
