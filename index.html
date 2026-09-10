@@ -575,7 +575,7 @@ function renderCourse(){
 
         const itemsHost = section.querySelector('.mod-items');
 
-moduleItems.forEach(row => {
+        moduleItems.forEach(row => {
             const type = row[2] ? row[2].trim().toLowerCase() : 'text';
             let title = row[3] || '';
             const content = row[4] || '';
@@ -586,7 +586,7 @@ moduleItems.forEach(row => {
 
             if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
 
-            // PitchCamp's exact ID slugifier (+ currentLessonId)
+            // PitchCamp clean ID slug
             const id = (currentLessonId + '_' + title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
             const div = document.createElement('div');
@@ -626,7 +626,11 @@ moduleItems.forEach(row => {
             }
             itemsHost.appendChild(div);
         });
-      
+    });
+
+    loadProgress();
+}
+
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
 function setStatus(text, cls){ const el = document.getElementById('save-status'); el.innerText = text; el.className = 'save-status ' + (cls || ''); }
 
@@ -634,7 +638,7 @@ async function saveProgress(){
   setStatus('Saving…', 'save-warn');
   const progress = [];
 
-  // Module completion checkboxes
+  // 1. Module completion checkboxes
   document.querySelectorAll('[id^="module-check-"]').forEach(check => {
     progress.push({
       item_id: (currentLessonId + '_module_' + check.dataset.module).toLowerCase(),
@@ -646,7 +650,7 @@ async function saveProgress(){
     });
   });
 
-  // Items (Answers and Polls)
+  // 2. Mod items (Answers & Polls)
   document.querySelectorAll('.mod-item').forEach(item => {
     const format = item.dataset.format;
     if (format === 'answer') {
@@ -670,47 +674,6 @@ async function saveProgress(){
         note: selected.join('|')
       });
     }
-  });
-
-  try {
-    const res = await fetch('/api/progress', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-      body: JSON.stringify({ lesson: currentLessonId, progress: progress })
-    });
-    if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
-  } catch (e) { setStatus('Error saving!', 'save-warn'); }
-}
-
-  // 2. Textarea answers
-  document.querySelectorAll('textarea.answer-input').forEach(input => {
-    const parentItem = input.closest('.mod-item');
-    const itemId = input.getAttribute('data-item-id');
-    const header = parentItem ? parentItem.dataset.header : itemId;
-    progress.push({
-      item_id: itemId,
-      header_name: header,
-      format: 'answer',
-      type: 'answer',
-      completed: 0,
-      note: input.value
-    });
-  });
-
-  // 3. Poll responses
-  document.querySelectorAll('.poll-box').forEach(box => {
-    const parentItem = box.closest('.mod-item');
-    const itemId = box.getAttribute('data-item-id');
-    const header = parentItem ? parentItem.dataset.header : itemId;
-    const selected = Array.from(box.querySelectorAll('input:checked')).map(i => i.value);
-    progress.push({
-      item_id: itemId,
-      header_name: header,
-      format: 'poll',
-      type: 'poll',
-      completed: 0,
-      note: selected.join('|')
-    });
   });
 
   try {
@@ -761,7 +724,7 @@ async function loadProgress(){
     console.error('Error loading progress:', e);
   }
 }
-  
+
 async function parseCSV(text) {
   const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
   for (let i = 0; i < text.length; i++) {
