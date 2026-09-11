@@ -117,6 +117,77 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
 </head>
+<script>
+/* Home page tweaks: hide the "Lessons" heading + cap community feed at 3 posts with internal scroll */
+(function () {
+  var feedBox = null;
+
+  function hideLessonsHeading() {
+    document.querySelectorAll('h1,h2,h3,h4').forEach(function (h) {
+      if (h.textContent.trim() === 'Lessons') h.style.display = 'none';
+    });
+  }
+
+  function findByPlaceholder() {
+    var els = document.querySelectorAll('div,p');
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].textContent.trim() === 'No posts yet. Be the first to share!') return els[i].parentElement;
+    }
+    return null;
+  }
+
+  function findFeedBox() {
+    if (feedBox && document.contains(feedBox)) return feedBox;
+    feedBox = document.getElementById('posts') || document.getElementById('feed') ||
+              document.getElementById('posts-list') || document.getElementById('postsList') || findByPlaceholder();
+    if (feedBox) return feedBox;
+    var hs = document.querySelectorAll('h1,h2,h3');
+    for (var i = 0; i < hs.length; i++) {
+      if (/Community Discussion/i.test(hs[i].textContent)) {
+        var kids = hs[i].parentElement.children, last = null;
+        for (var j = 0; j < kids.length; j++) { if (kids[j].tagName === 'DIV') last = kids[j]; }
+        if (last) { feedBox = last; return feedBox; }
+      }
+    }
+    return null;
+  }
+
+  function capFeed() {
+    var box = findFeedBox();
+    if (!box) return;
+    box.style.overflowY = 'auto';
+    box.style.paddingRight = '4px';
+    if (box.children.length > 3) {
+      var bs = getComputedStyle(box);
+      var gap = parseFloat(bs.rowGap) || parseFloat(bs.gap) || 0;
+      var h = gap * 2;
+      for (var i = 0; i < 3; i++) {
+        var cs = getComputedStyle(box.children[i]);
+        h += box.children[i].offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+      }
+      box.style.maxHeight = Math.max(h + 6, 240) + 'px';
+    } else {
+      box.style.maxHeight = '';
+    }
+  }
+
+  function apply() { hideLessonsHeading(); capFeed(); }
+
+  var queued = false;
+  function queue() {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; apply(); });
+  }
+
+  apply();
+  document.addEventListener('DOMContentLoaded', function () {
+    apply();
+    new MutationObserver(queue).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', queue);
+  });
+})();
+</script>
 <body>
 
 <header class="site-head">
