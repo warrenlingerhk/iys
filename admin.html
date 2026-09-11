@@ -6,142 +6,123 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IYS — Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{ --pink:#E600FF; --blue:#00B4D8; --navy:#023E8A; --cream:#F8F9FA; --slate:#6C757D; --red:#dc3545; --green:#28a745; }
-*{box-sizing:border-box} body{background:var(--cream);color:var(--navy);font-family:'Nunito Sans',sans-serif;margin:0;font-size:16px}
-h1,h2,.brand{font-family:'Poppins',sans-serif} .wrap{width:min(1150px,94%);margin-inline:auto}
-.site-head{position:sticky;top:0;z-index:50;background:var(--cream)}
-.head-in{display:flex;justify-content:space-between;align-items:center;padding:12px 0;gap:12px;border-bottom:3px solid var(--pink)}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.25rem;color:var(--navy);text-decoration:none}
-.btn{border-radius:999px;font-weight:800;cursor:pointer;font-family:'Nunito Sans';padding:6px 16px;font-size:.85rem}
-.btn.ghost{background:#fff;border:2px solid var(--navy);color:var(--navy);text-decoration:none}
-h1{font-size:1.6rem;margin:24px 0 6px} h2{font-size:1.2rem;margin:28px 0 12px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
-.card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 5px 0 rgba(2,62,138,.12)}
-.card .num{font-size:1.7rem;font-weight:800;font-family:'Poppins'; color: var(--navy);}
-.card .lbl{font-size:.85rem;font-weight:700;color:var(--slate)}
-.table-wrap{overflow-x:auto;background:#fff;border-radius:14px;box-shadow:0 5px 0 rgba(2,62,138,.12)}
-table{width:100%;border-collapse:collapse;min-width:640px}
-th,td{padding:10px 14px;text-align:left;font-size:.9rem;border-bottom:1px solid rgba(2,62,138,.08);white-space:nowrap}
-th{background:var(--navy);color:#fff;font-weight:800}
-td input[type="checkbox"]{width:18px;height:18px;accent-color:var(--pink);cursor:pointer}
-.report{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 0 rgba(2,62,138,.10)}
-.report .meta{font-size:.85rem;color:var(--slate);font-weight:700;margin-bottom:6px}
-.report .actions{display:flex;gap:10px;flex-wrap:wrap}
-.report .actions button{border:none;border-radius:999px;padding:6px 14px;font-weight:800;cursor:pointer;font-size:.8rem}
-.resolve{background:var(--blue);color:#fff} .delete{background:var(--red);color:#fff}
-.empty{color:var(--slate);font-weight:700}
+  :root{--navy:#00459A;--magenta:#D600D6;--bg:#f0f2f5;--card:#fff;--muted:#5b6b7f;--red:#c62828;}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;}
+  body{background:var(--bg);color:var(--navy);padding:24px;}
+  header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--magenta);padding-bottom:14px;margin-bottom:22px;}
+  header h1{font-size:1.5rem;} header h1 span{color:var(--magenta);}
+  .pill{background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:999px;padding:8px 18px;font-weight:700;text-decoration:none;}
+  h2{margin:26px 0 10px;font-size:1.15rem;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:12px 0 8px;}
+  .card{background:var(--card);border-radius:10px;padding:16px;box-shadow:0 2px 6px rgba(0,20,60,.08);}
+  .card b{font-size:1.6rem;display:block;margin-bottom:4px;} .card span{color:var(--muted);font-size:.85rem;}
+  .row{background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,20,60,.08);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;}
+  .muted{color:var(--muted);font-size:.9rem;}
+  button{cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:.85rem;}
+  .btn-magenta{background:var(--magenta);color:#fff;} .btn-navy{background:var(--navy);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--navy);border:2px solid var(--navy);} .btn-red{background:var(--red);color:#fff;}
+  .badge{background:var(--navy);color:#fff;border-radius:6px;padding:2px 8px;font-size:.7rem;font-weight:700;margin-left:6px;}
+  .badge.m{background:var(--magenta);} .badge.r{background:var(--red);}
+  label.chk{display:flex;gap:6px;align-items:center;font-size:.82rem;color:var(--muted);font-weight:600;}
+  #login{max-width:360px;margin:10vh auto;background:#fff;padding:26px;border-radius:12px;box-shadow:0 4px 14px rgba(0,20,60,.12);}
+  #login h1{margin-bottom:14px;} #login h1 span{color:var(--magenta);}
+  input{width:100%;padding:10px;margin:6px 0 12px;border:2px solid #dfe6ee;border-radius:8px;font-size:.95rem;}
+  .hidden{display:none;} .post-ex{background:#f5f7fa;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:.85rem;color:var(--muted);max-width:520px;}
 </style>
 </head>
 <body>
-<header class="site-head">
-  <div class="head-in wrap">
-   <a class="brand" href="/"><span>IYS <span style="color:var(--pink)">Admin</span></span></a>
-    <a class="btn ghost" href="/">← Back to site</a>
-  </div>
-</header>
 
-<main class="wrap">
-  <h1>Admin Dashboard</h1>
+<div id="login" class="hidden">
+  <h1>IYS <span>Admin</span></h1>
+  <input id="li-email" type="email" placeholder="Email">
+  <input id="li-pass" type="password" placeholder="Password">
+  <button class="btn-navy" onclick="doLogin()">Log in</button>
+  <p id="li-err" class="muted" style="margin-top:10px;"></p>
+</div>
+
+<div id="dash" class="hidden">
+  <header>
+    <h1>IYS <span>Admin</span></h1>
+    <a class="pill" href="/">&#8592; Back to site</a>
+  </header>
+  <h2 style="margin-top:0;font-size:1.6rem;">Admin Dashboard</h2>
   <div class="cards" id="stats"></div>
-  <h2>Pending Approvals (No Access Yet)</h2>
-  <div id="pending"></div>
-  <h2>Analytics</h2>
-  <div class="cards" id="analytics"></div>
-  <h2>Classmates</h2>
-  <div class="table-wrap">
-    <table id="users-table"><thead></thead><tbody id="users-body"></tbody></table>
-  </div>
-  <h2>Reports</h2>
-  <div id="reports"></div>
-</main>
+  <h2>Pending Approvals</h2><div id="pending"></div>
+  <h2>Analytics</h2><div class="cards" id="analytics"></div>
+  <h2>Classmates (Admin + Offer Access)</h2><div id="members"></div>
+  <h2>Reports</h2><div id="reports"></div>
+</div>
 
 <script>
-const API_URL = '';
-const token = localStorage.getItem('token');
-if (!token || localStorage.getItem('iys_is_admin') !== '1') window.location.href = '/';
-
-async function api(path, opts = {}) {
-  opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + token });
-  if (opts.body) opts.headers['Content-Type'] = 'application/json';
-  const res = await fetch(API_URL + path, opts);
-  if (res.status === 401 || res.status === 403) { window.location.href = '/'; throw new Error('Not authorized'); }
-  if (!res.ok) throw new Error('Request failed');
-  return res.json();
+const KEYS=['iys_token','token','pc_token','pitchcamp_token'];
+let TOKEN='';
+for(const k of KEYS){const v=localStorage.getItem(k);if(v){TOKEN=v;break;}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,opts={}){
+  return fetch(path,{method:opts.method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:opts.body?JSON.stringify(opts.body):undefined});
 }
-
-function card(num, lbl) { return '<div class="card"><div class="num">' + num + '</div><div class="lbl">' + lbl + '</div></div>'; }
-
-async function loadStats() {
-  try {
-    const s = await api('/api/admin/stats');
-    document.getElementById('stats').innerHTML = card(s.users, 'Classmates') + card(s.posts, 'Posts') + card(s.reports, 'Reports') + card(s.mod1, 'Module 1 completed');
-  } catch (e) {}
+async function act(path,body){const r=await api(path,{method:'POST',body});if(!r.ok){const j=await r.json();alert(j.error||'Action failed.');}loadAll();}
+async function boot(){
+  const me=await api('/api/me');
+  if(!me.ok){$('login').classList.remove('hidden');return;}
+  const meJ=await me.json();
+  if(!meJ.is_admin){$('login').classList.remove('hidden');$('li-err').textContent='This account does not have admin access.';return;}
+  $('login').classList.add('hidden');$('dash').classList.remove('hidden');loadAll();
 }
-
-async function loadPending() {
-  try {
-    const list = await api('/api/admin/pending');
-    const host = document.getElementById('pending');
-    if (!list.length) { host.innerHTML = '<p class="empty">No pending classmates. </p>'; return; }
-    host.innerHTML = list.map(u => '<div class="report"><div class="meta">#' + (u.member_number || '—') + ' ' + u.name + ' — ' + u.email + '</div><div class="actions"><button class="resolve" onclick="approveUser(' + u.id + ')">Grant Access</button></div></div>').join('');
-  } catch (e) {}
+async function doLogin(){
+  const r=await api('/api/login',{method:'POST',body:{email:$('li-email').value,password:$('li-pass').value}});
+  const j=await r.json();
+  if(!r.ok){$('li-err').textContent=j.error||'Login failed.';return;}
+  TOKEN=j.token;KEYS.forEach(k=>localStorage.setItem(k,j.token));boot();
 }
-
-async function approveUser(id) {
-  await api('/api/admin/approve', { method: 'POST', body: JSON.stringify({ user_id: id }) });
-  loadPending(); loadUsers(); loadStats();
+async function loadAll(){
+  const [stats,pending,analytics,users,access,reports]=await Promise.all([
+    api('/api/admin/stats').then(r=>r.json()),api('/api/admin/pending').then(r=>r.json()),
+    api('/api/admin/analytics').then(r=>r.json()),api('/api/admin/users').then(r=>r.json()),
+    api('/api/admin/access').then(r=>r.json()),api('/api/admin/reports').then(r=>r.json())]);
+  $('stats').innerHTML=
+    `<div class="card"><b>${stats.users||0}</b><span>Members</span></div>
+     <div class="card"><b>${stats.posts||0}</b><span>Posts</span></div>
+     <div class="card"><b>${stats.reports||0}</b><span>Reports</span></div>
+     <div class="card"><b>${stats.mod1||0}</b><span>Module 1 completed</span></div>`;
+  $('analytics').innerHTML=
+    `<div class="card"><b>${analytics.totalUsers||0}</b><span>Total users</span></div>
+     <div class="card"><b>${analytics.activeLearners||0}</b><span>Active learners</span></div>
+     <div class="card"><b>${analytics.eliteRate||0}%</b><span>Completion rate</span></div>
+     <div class="card"><b>${analytics.engagement||0}</b><span>Engagement</span></div>
+     <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`;
+  $('pending').innerHTML=(pending||[]).length?pending.map(u=>
+    `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b> <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
+     <button class="btn-magenta" onclick="act('/api/admin/approve',{user_id:${u.id}})">Approve</button></div>`).join('')
+    :'<p class="muted">No pending applications. 🎉</p>';
+  const offerMap={};(access||[]).forEach(a=>{(offerMap[a.user_id]=offerMap[a.user_id]||[]).push(a.offer);});
+  $('members').innerHTML=(users||[]).map(u=>{
+    const offers=offerMap[u.id]||[];
+    return `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b>
+      ${u.is_admin?'<span class="badge m">ADMIN</span>':''}${u.is_paid?'<span class="badge">PAID</span>':''}${u.banned?'<span class="badge r">BANNED</span>':''}
+      <div class="muted">${esc(u.email)}</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+        <label class="chk"><input type="checkbox" ${u.is_admin?'checked':''} onchange="act('/api/admin/set-admin',{user_id:${u.id},is_admin:this.checked?1:0})"> Admin</label>
+        <label class="chk"><input type="checkbox" ${offers.includes('IYS Course')?'checked':''} onchange="act('/api/admin/access',{user_id:${u.id},offer:'IYS Course',granted:this.checked})"> IYS Course</label>
+        <button class="btn-ghost" onclick="resetPw(${u.id})">Reset PW</button>
+        ${u.banned?'':'<button class="btn-red" onclick="banUser('+u.id+')">Ban</button>'}
+      </div></div>`;}).join('')||'<p class="muted">No members yet.</p>';
+  $('reports').innerHTML=(reports||[]).length?reports.map(r=>
+    `<div class="row" style="display:block;"><div class="muted">${esc(r.reporter_name||'?')} reported ${esc(r.reported_user_name||'?')} &middot; ${esc((r.created_at||'').slice(0,10))} ${r.resolved?'<span class="badge">RESOLVED</span>':''}</div>
+     <div class="post-ex">${esc(r.post_content||'(post deleted)')}</div>
+     <div class="muted" style="margin-bottom:8px;">Reason: ${esc(r.reason||'—')}</div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+       <button class="btn-navy" onclick="act('/api/admin/reports/resolve',{report_id:${r.id},resolved:${r.resolved?0:1}})">${r.resolved?'Reopen':'Resolve'}</button>
+       ${r.post_id?`<button class="btn-red" onclick="act('/api/posts/delete',{post_id:${r.post_id}})">Delete post</button>`:''}
+       <button class="btn-ghost" onclick="act('/api/admin/reports/delete',{report_id:${r.id}})">Delete report</button>
+     </div></div>`).join('')
+    :'<p class="muted">No reports. 🎉</p>';
 }
-
-async function loadAnalytics() {
-  try {
-    const a = await api('/api/admin/analytics');
-    document.getElementById('analytics').innerHTML = card(a.totalUsers, 'Total classmates') + card(a.activeLearners, 'Active learners') + card(a.eliteRate + '%', 'Completion rate');
-  } catch (e) {}
-}
-
-async function loadUsers() {
-  try {
-    const users = await api('/api/admin/users');
-    // We removed the lesson access columns for simplicity since we don't have lessons yet
-    document.querySelector('#users-table thead').innerHTML = '<tr><th>Member #</th><th>Name</th><th>Email</th><th>Admin</th><th>Joined</th><th>Actions</th></tr>';
-
-    document.getElementById('users-body').innerHTML = users.map(u => {
-      return '<tr><td>' + (u.member_number || '') + '</td><td>' + u.name + '</td><td>' + u.email + '</td>' +
-        '<td><input type="checkbox" ' + (u.is_admin ? 'checked' : '') + ' onchange="setAdmin(' + u.id + ', this.checked)"></td>' +
-        '<td>' + (u.created_at || '').slice(0, 10) + '</td>' +
-        '<td><button class="btn ghost" style="font-size:.75rem;padding:4px 10px" onclick="resetUserPassword(' + u.id + ', \'' + u.name.replace(/'/g, "\\'") + '\')">Reset PW</button></td>' +
-        '</tr>';
-    }).join('');
-  } catch (e) {}
-}
-
-async function resetUserPassword(userId, userName) {
-  const newPw = prompt('Enter a temporary 8+ character password for ' + userName + ':');
-  if (!newPw) return;
-  if (newPw.length < 8) { alert('Password must be at least 8 characters.'); return; }
-  try {
-    await api('/api/admin/reset-password', { method: 'POST', body: JSON.stringify({ user_id: userId, new_password: newPw }) });
-    alert('Password for ' + userName + ' reset to: ' + newPw);
-  } catch (e) { alert('Error: ' + e.message); }
-}
-
-async function setAdmin(id, on) { try { await api('/api/admin/set-admin', { method: 'POST', body: JSON.stringify({ user_id: id, is_admin: on }) }); } catch (e) { alert(e.message); } loadUsers(); }
-
-async function loadReports() {
-  try {
-    const reports = await api('/api/admin/reports');
-    const host = document.getElementById('reports');
-    if (!reports.length) { host.innerHTML = '<p class="empty">No reports. 🎉</p>'; return; }
-    host.innerHTML = reports.map(r => '<div class="report"><div class="meta">Reported by ' + (r.reporter_name || 'Unknown') + ' on ' + (r.created_at || '').slice(0, 10) + (r.resolved ? ' <span style="color:var(--green)">• RESOLVED</span>' : '') + '</div><div class="content">' + (r.post_content || '[deleted]') + '</div><div class="actions"><button class="resolve" onclick="resolveReport(' + r.id + ', ' + (r.resolved ? 0 : 1) + ')">' + (r.resolved ? 'Unresolve' : 'Resolve') + '</button><button class="delete" onclick="deleteReport(' + r.id + ')">Delete</button></div></div>').join('');
-  } catch (e) {}
-}
-
-async function resolveReport(id, resolved) { await api('/api/admin/reports/resolve', { method: 'POST', body: JSON.stringify({ report_id: id, resolved: !!resolved }) }); loadReports(); }
-async function deleteReport(id) { if (!confirm('Delete report?')) return; await api('/api/admin/reports/delete', { method: 'POST', body: JSON.stringify({ report_id: id }) }); loadReports(); }
-
-loadStats(); loadPending(); loadAnalytics(); loadUsers(); loadReports();
+async function resetPw(id){const pw=prompt('New password for this member (8+ characters):');if(!pw)return;act('/api/admin/reset-password',{user_id:id,new_password:pw});}
+async function banUser(id){if(!confirm('Ban this member? They will no longer be able to log in.'))return;act('/api/users/ban',{user_id:id});}
+boot();
 </script>
 </body>
 </html>
