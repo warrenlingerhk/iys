@@ -57,80 +57,75 @@
 <script>
 const KEYS=['iys_token','token','pc_token','pitchcamp_token'];
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-let TOKEN='';
+let TOKEN='';let NOT_ADMIN_SEEN=false;let HAS_ACCESS=false;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(path,opts={}){
   return fetch(path,{method:opts.method||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:opts.body?JSON.stringify(opts.body):undefined});
 }
-async function probe(t){try{const r=await fetch('/api/me',{headers:{'Authorization':'Bearer '+t}});return r.ok;}catch(e){return false;}}
+async function getJSON(path){const r=await api(path);if(!r.ok)return null;try{const j=await r.json();return j;}catch(e){return null;}}
+async function statsStatus(t){try{const r=await fetch('/api/admin/stats',{headers:{'Authorization':'Bearer '+t}});return r.status;}catch(e){return 0;}}
 async function findToken(){
-  for(const k of KEYS){const v=localStorage.getItem(k);if(v&&UUID.test(v)&&await probe(v))return v;}
-  for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i));if(v&&UUID.test(v)&&await probe(v))return v;}
+  const cands=[];
+  for(const k of KEYS){const v=localStorage.getItem(k);if(v&&UUID.test(v)&&!cands.includes(v))cands.push(v);}
+  for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i));if(v&&UUID.test(v)&&!cands.includes(v))cands.push(v);}
+  for(const t of cands){const s=await statsStatus(t);if(s===200)return t;if(s===403)NOT_ADMIN_SEEN=true;}
   return '';
 }
 function showLogin(msg){$('login').classList.remove('hidden');$('dash').classList.add('hidden');$('li-err').textContent=msg||'';}
 function showDash(){$('login').classList.add('hidden');$('dash').classList.remove('hidden');loadAll();}
-const MISSING_ME='Setup needed: the worker.js on the server has no /api/me route. Replace worker.js with the updated version, run wrangler deploy, then refresh this page.';
 async function boot(){
   TOKEN=await findToken();
-  if(!TOKEN){
-    const chk=await fetch('/api/me',{headers:{'Authorization':'Bearer 00000000-0000-0000-0000-000000000000'}});
-    if(chk.status===404||chk.status===405){showLogin(MISSING_ME);return;}
-    showLogin('');return;
-  }
-  const me=await api('/api/me');
-  if(!me.ok){TOKEN='';showLogin('Your session expired — log in below.');return;}
-  const meJ=await me.json();
-  if(!meJ.is_admin){showLogin('This account does not have admin access.');return;}
-  showDash();
+  if(TOKEN){showDash();return;}
+  if(NOT_ADMIN_SEEN){showLogin('You are logged in, but this account does not have admin access yet.');return;}
+  showLogin('');
 }
 async function doLogin(){
   const r=await api('/api/login',{method:'POST',body:{email:$('li-email').value,password:$('li-pass').value}});
   const j=await r.json();
   if(!r.ok){showLogin(j.error||'Login failed.');return;}
   TOKEN=j.token;KEYS.forEach(k=>localStorage.setItem(k,j.token));
-  const me=await api('/api/me');
-  if(me.status===404||me.status===405){showLogin(MISSING_ME);return;}
-  if(!me.ok){showLogin('Login worked, but the session check failed. Refresh and try again.');return;}
-  const meJ=await me.json();
-  if(!meJ.is_admin){showLogin('This account does not have admin access.');return;}
-  showDash();
+  const s=await statsStatus(TOKEN);
+  if(s===200){showDash();return;}
+  if(s===403){showLogin('Login worked, but this account does not have admin access yet.');return;}
+  showLogin('Login worked, but the admin check failed. Refresh and try again.');
 }
 async function act(path,body){const r=await api(path,{method:'POST',body});if(!r.ok){const j=await r.json();alert(j.error||'Action failed.');}loadAll();}
 async function loadAll(){
   const [stats,pending,analytics,users,access,reports]=await Promise.all([
-    api('/api/admin/stats').then(r=>r.json()),api('/api/admin/pending').then(r=>r.json()),
-    api('/api/admin/analytics').then(r=>r.json()),api('/api/admin/users').then(r=>r.json()),
-    api('/api/admin/access').then(r=>r.json()),api('/api/admin/reports').then(r=>r.json())]);
-  $('stats').innerHTML=
+    getJSON('/api/admin/stats'),getJSON('/api/admin/pending'),getJSON('/api/admin/analytics'),
+    getJSON('/api/admin/users'),getJSON('/api/admin/access'),getJSON('/api/admin/reports')]);
+  HAS_ACCESS=Array.isArray(access);
+  $('stats').innerHTML=stats?
     `<div class="card"><b>${stats.users||0}</b><span>Members</span></div>
      <div class="card"><b>${stats.posts||0}</b><span>Posts</span></div>
      <div class="card"><b>${stats.reports||0}</b><span>Reports</span></div>
-     <div class="card"><b>${stats.mod1||0}</b><span>Module 1 completed</span></div>`;
-  $('analytics').innerHTML=
+     <div class="card"><b>${stats.mod1||0}</b><span>Module 1 completed</span></div>`
+    :'<p class="muted">Stats unavailable — are you still logged in?</p>';
+  $('analytics').innerHTML=analytics?
     `<div class="card"><b>${analytics.totalUsers||0}</b><span>Total users</span></div>
      <div class="card"><b>${analytics.activeLearners||0}</b><span>Active learners</span></div>
      <div class="card"><b>${analytics.eliteRate||0}%</b><span>Completion rate</span></div>
      <div class="card"><b>${analytics.engagement||0}</b><span>Engagement</span></div>
-     <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`;
-  $('pending').innerHTML=(pending||[]).length?pending.map(u=>
-    `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b> <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
+     <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`:'';
+  $('pending').innerHTML=(Array.isArray(pending)&&pending.length)?pending.map(u=>
+    `<div class="row"><div><b>#${esc(u.member_number||u.user_number)} ${esc(u.name)}</b> <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
      <button class="btn-magenta" onclick="act('/api/admin/approve',{user_id:${u.id}})">Approve</button></div>`).join('')
     :'<p class="muted">No pending applications. 🎉</p>';
-  const offerMap={};(Array.isArray(access)?access:[]).forEach(a=>{(offerMap[a.user_id]=offerMap[a.user_id]||[]).push(a.offer);});
-  $('members').innerHTML=(Array.isArray(users)?users:[]).map(u=>{
+  const offerMap={};(HAS_ACCESS?access:[]).forEach(a=>{(offerMap[a.user_id]=offerMap[a.user_id]||[]).push(a.offer);});
+  $('members').innerHTML=(Array.isArray(users)&&users.length)?users.map(u=>{
     const offers=offerMap[u.id]||[];
-    return `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b>
+    return `<div class="row"><div><b>#${esc(u.member_number||u.user_number)} ${esc(u.name)}</b>
       ${u.is_admin?'<span class="badge m">ADMIN</span>':''}${u.is_paid?'<span class="badge">PAID</span>':''}${u.banned?'<span class="badge r">BANNED</span>':''}
       <div class="muted">${esc(u.email)}</div></div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
         <label class="chk"><input type="checkbox" ${u.is_admin?'checked':''} onchange="act('/api/admin/set-admin',{user_id:${u.id},is_admin:this.checked?1:0})"> Admin</label>
-        <label class="chk"><input type="checkbox" ${offers.includes('IYS Course')?'checked':''} onchange="act('/api/admin/access',{user_id:${u.id},offer:'IYS Course',granted:this.checked})"> IYS Course</label>
+        ${HAS_ACCESS?`<label class="chk"><input type="checkbox" ${offers.includes('IYS Course')?'checked':''} onchange="act('/api/admin/access',{user_id:${u.id},offer:'IYS Course',granted:this.checked})"> IYS Course</label>`:''}
         <button class="btn-ghost" onclick="resetPw(${u.id})">Reset PW</button>
         ${u.banned?'':'<button class="btn-red" onclick="banUser('+u.id+')">Ban</button>'}
-      </div></div>`;}).join('')||'<p class="muted">No members yet.</p>';
-  $('reports').innerHTML=(Array.isArray(reports)?reports:[]).map(r=>
+      </div></div>`;}).join('')
+    :'<p class="muted">No members yet.</p>';
+  $('reports').innerHTML=Array.isArray(reports)?(reports.length?reports.map(r=>
     `<div class="row" style="display:block;"><div class="muted">${esc(r.reporter_name||'?')} reported ${esc(r.reported_user_name||'?')} &middot; ${esc((r.created_at||'').slice(0,10))} ${r.resolved?'<span class="badge">RESOLVED</span>':''}</div>
      <div class="post-ex">${esc(r.post_content||'(post deleted)')}</div>
      <div class="muted" style="margin-bottom:8px;">Reason: ${esc(r.reason||'—')}</div>
@@ -138,8 +133,8 @@ async function loadAll(){
        <button class="btn-navy" onclick="act('/api/admin/reports/resolve',{report_id:${r.id},resolved:${r.resolved?0:1}})">${r.resolved?'Reopen':'Resolve'}</button>
        ${r.post_id?`<button class="btn-red" onclick="act('/api/posts/delete',{post_id:${r.post_id}})">Delete post</button>`:''}
        <button class="btn-ghost" onclick="act('/api/admin/reports/delete',{report_id:${r.id}})">Delete report</button>
-     </div></div>`).join('')
-    :'<p class="muted">No reports. 🎉</p>';
+     </div></div>`).join(''):'<p class="muted">No reports. 🎉</p>')
+    :'<p class="muted">Reports list will appear after the next worker.js update.</p>';
 }
 async function resetPw(id){const pw=prompt('New password for this member (8+ characters):');if(!pw)return;act('/api/admin/reset-password',{user_id:id,new_password:pw});}
 async function banUser(id){if(!confirm('Ban this member? They will no longer be able to log in.'))return;act('/api/users/ban',{user_id:id});}
