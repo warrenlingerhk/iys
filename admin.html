@@ -24,8 +24,10 @@
   button[disabled]{opacity:.35;cursor:not-allowed;}
   .btn-magenta{background:var(--magenta);color:#fff;} .btn-navy{background:var(--navy);color:#fff;}
   .btn-ghost{background:#fff;color:var(--navy);border:2px solid var(--navy);} .btn-red{background:var(--red);color:#fff;}
+  .btn-mini{padding:5px 8px;font-size:.68rem;line-height:1.15;border-radius:8px;white-space:normal;min-width:66px;text-align:center;}
   .badge{border-radius:6px;padding:2px 8px;font-size:.7rem;font-weight:700;margin-left:6px;color:#fff;background:var(--navy);}
   .badge.m{background:var(--magenta);} .badge.r{background:var(--red);} .badge.p{background:var(--amber);} .badge.g{background:var(--green);}
+  .chip{background:#eef2f7;border-radius:8px;padding:4px 10px;font-size:.75rem;font-weight:800;color:var(--navy);margin-right:6px;display:inline-block;margin-top:6px;}
   label.chk{display:flex;gap:6px;align-items:center;font-size:.82rem;color:var(--muted);font-weight:600;}
   #login{max-width:360px;margin:10vh auto;background:#fff;padding:26px;border-radius:12px;box-shadow:0 4px 14px rgba(0,20,60,.12);}
   #login h1{margin-bottom:14px;} #login h1 span{color:var(--magenta);}
@@ -50,14 +52,13 @@
   </header>
   <h2 style="margin-top:0;font-size:1.6rem;">Admin Dashboard</h2>
   <div class="cards" id="stats"></div>
-  <h2>Pending Approvals</h2><div id="pending"></div>
   <h2>Analytics</h2><div class="cards" id="analytics"></div>
   <h2>Classmates — full member list</h2><div id="members"></div>
   <h2>Reports</h2><div id="reports"></div>
 </div>
 
 <script>
-const KEYS=['iys_token','token','pc_token','pitchcamp_token'];
+const KEYS=['iys_token','token'];
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let TOKEN='';
 const $=id=>document.getElementById(id);
@@ -92,14 +93,14 @@ async function doLogin(){
 async function act(path,body){const r=await api(path,{method:'POST',body});if(!r.ok){const j=await r.json();alert(j.error||'Action failed.');}loadAll();}
 function setStatus(id,status){act('/api/admin/status',{user_id:id,status});}
 async function loadAll(){
-  const [stats,pending,analytics,users,reports]=await Promise.all([
-    getJSON('/api/admin/stats'),getJSON('/api/admin/pending'),getJSON('/api/admin/analytics'),
+  const [stats,analytics,users,reports]=await Promise.all([
+    getJSON('/api/admin/stats'),getJSON('/api/admin/analytics'),
     getJSON('/api/admin/users'),getJSON('/api/admin/reports')]);
   $('stats').innerHTML=stats?
     `<div class="card"><b>${stats.users||0}</b><span>Members</span></div>
      <div class="card"><b>${stats.posts||0}</b><span>Posts</span></div>
      <div class="card"><b>${stats.reports||0}</b><span>Open reports</span></div>
-     <div class="card"><b>${stats.mod1||0}</b><span>Module 1 completed</span></div>`
+     <div class="card"><b>${stats.active||0}</b><span>Active users (last 5 min)</span></div>`
     :'<p class="muted">Stats unavailable — are you still logged in?</p>';
   $('analytics').innerHTML=analytics?
     `<div class="card"><b>${analytics.totalUsers||0}</b><span>Total users</span></div>
@@ -107,22 +108,19 @@ async function loadAll(){
      <div class="card"><b>${analytics.eliteRate||0}%</b><span>Completion rate</span></div>
      <div class="card"><b>${analytics.engagement||0}</b><span>Engagement</span></div>
      <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`:'';
-  $('pending').innerHTML=(Array.isArray(pending)&&pending.length)?pending.map(u=>
-    `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b> <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
-     <button class="btn-magenta" onclick="setStatus(${u.id},'Approved')">Approve</button></div>`).join('')
-    :'<p class="muted">No pending applications. 🎉</p>';
   $('members').innerHTML=(Array.isArray(users)&&users.length)?users.map(u=>{
     const sb=u.status==='Approved'?'g':(u.status==='Banned'?'r':'p');
     return `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b>
       <span class="badge ${sb}">${esc(u.status||'Pending').toUpperCase()}</span>
       ${u.is_admin?'<span class="badge m">ADMIN</span>':''}
-      <div class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-        <button class="btn-navy" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Make Approved</button>
-        <button class="btn-ghost" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Make Pending</button>
-        <button class="btn-red" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Make Banned</button>
+      <div class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</div>
+      <div><span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span></div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:340px;">
+        <button class="btn-navy btn-mini" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Make Approved</button>
+        <button class="btn-ghost btn-mini" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Make Pending</button>
+        <button class="btn-red btn-mini" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Make Banned</button>
         <label class="chk"><input type="checkbox" ${u.is_admin?'checked':''} onchange="act('/api/admin/set-admin',{user_id:${u.id},is_admin:this.checked?1:0})"> Admin</label>
-        <button class="btn-ghost" onclick="resetPw(${u.id})">Reset PW</button>
+        <button class="btn-ghost btn-mini" onclick="resetPw(${u.id})">Reset PW</button>
       </div></div>`;}).join('')
     :'<p class="muted">No members yet.</p>';
   $('reports').innerHTML=Array.isArray(reports)?(reports.length?reports.map(r=>
@@ -137,6 +135,7 @@ async function loadAll(){
     :'<p class="muted">Reports unavailable.</p>';
 }
 async function resetPw(id){const pw=prompt('New password for this member (8+ characters):');if(!pw)return;act('/api/admin/reset-password',{user_id:id,new_password:pw});}
+setInterval(function(){ if(TOKEN) api('/api/heartbeat').catch(function(){}); }, 60000);
 boot();
 </script>
 </body>
