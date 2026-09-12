@@ -18,7 +18,7 @@
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:12px 0 8px;}
   .card{background:var(--card);border-radius:10px;padding:16px;box-shadow:0 2px 6px rgba(0,20,60,.08);}
   .card b{font-size:1.6rem;display:block;margin-bottom:4px;} .card span{color:var(--muted);font-size:.85rem;}
-  .row{background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,20,60,.08);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;}
+   .row{background:var(--card);border-radius:10px;padding:8px 12px;margin-bottom:8px;box-shadow:0 2px 6px rgba(0,20,60,.08);display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
   .muted{color:var(--muted);font-size:.9rem;}
   button{cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:.85rem;}
   button[disabled]{opacity:.35;cursor:not-allowed;}
@@ -27,7 +27,7 @@
   .btn-mini{padding:5px 8px;font-size:.68rem;line-height:1.15;border-radius:8px;white-space:normal;min-width:66px;text-align:center;}
   .badge{border-radius:6px;padding:2px 8px;font-size:.7rem;font-weight:700;margin-left:6px;color:#fff;background:var(--navy);}
   .badge.m{background:var(--magenta);} .badge.r{background:var(--red);} .badge.p{background:var(--amber);} .badge.g{background:var(--green);}
-  .chip{background:#eef2f7;border-radius:8px;padding:4px 10px;font-size:.75rem;font-weight:800;color:var(--navy);margin-right:6px;display:inline-block;margin-top:6px;}
+    .chip{background:#eef2f7;border-radius:8px;padding:3px 9px;font-size:.72rem;font-weight:800;color:var(--navy);display:inline-block;}
   label.chk{display:flex;gap:6px;align-items:center;font-size:.82rem;color:var(--muted);font-weight:600;}
   #login{max-width:360px;margin:10vh auto;background:#fff;padding:26px;border-radius:12px;box-shadow:0 4px 14px rgba(0,20,60,.12);}
   #login h1{margin-bottom:14px;} #login h1 span{color:var(--magenta);}
@@ -110,15 +110,16 @@ async function loadAll(){
      <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`:'';
   $('members').innerHTML=(Array.isArray(users)&&users.length)?users.map(u=>{
     const sb=u.status==='Approved'?'g':(u.status==='Banned'?'r':'p');
-    return `<div class="row"><div><b>#${esc(u.member_number)} ${esc(u.name)}</b>
+    return `<div class="row"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <b>#${esc(u.member_number)} ${esc(u.name)}</b>
       <span class="badge ${sb}">${esc(u.status||'Pending').toUpperCase()}</span>
       ${u.is_admin?'<span class="badge m">ADMIN</span>':''}
-      <div class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</div>
-      <div><span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span></div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:340px;">
-        <button class="btn-navy btn-mini" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Make Approved</button>
-        <button class="btn-ghost btn-mini" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Make Pending</button>
-        <button class="btn-red btn-mini" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Make Banned</button>
+      <span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span>
+      <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <button class="btn-navy btn-mini" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Approve</button>
+        <button class="btn-ghost btn-mini" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Pending</button>
+        <button class="btn-red btn-mini" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Banned</button>
         <label class="chk"><input type="checkbox" ${u.is_admin?'checked':''} onchange="act('/api/admin/set-admin',{user_id:${u.id},is_admin:this.checked?1:0})"> Admin</label>
         <button class="btn-ghost btn-mini" onclick="resetPw(${u.id})">Reset PW</button>
       </div></div>`;}).join('')
