@@ -811,5 +811,66 @@ async function parseCSV(text) {
 
 showHome();
 </script>
+<script>
+/* IYS access gate + report buttons */
+(function(){
+  const KEYS=['iys_token','token','pc_token','pitchcamp_token'];
+  const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let TOKEN='';
+  function tokenList(){const c=[];for(const k of KEYS){const v=localStorage.getItem(k);if(v&&UUID.test(v)&&!c.includes(v))c.push(v);}for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i));if(v&&UUID.test(v)&&!c.includes(v))c.push(v);}return c;}
+  async function me(){for(const t of tokenList()){try{const r=await fetch('/api/me',{headers:{'Authorization':'Bearer '+t}});if(r.ok){TOKEN=t;return await r.json();}}catch(e){}}return null;}
+  function clearTokens(){const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);const v=localStorage.getItem(k);if(v&&UUID.test(v))ks.push(k);}ks.forEach(k=>localStorage.removeItem(k));}
+  function overlay(title,msg){
+    if(document.getElementById('gate-overlay'))return;
+    const d=document.createElement('div');d.id='gate-overlay';
+    d.style.cssText='position:fixed;inset:0;background:#f0f2f5;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+    d.innerHTML='<div style="max-width:440px;background:#fff;border-radius:14px;padding:32px;box-shadow:0 6px 20px rgba(0,20,60,.15);text-align:center;font-family:Segoe UI,system-ui,sans-serif;">'
+      +'<div style="font-size:1.6rem;font-weight:800;color:#00459A;margin-bottom:12px;">'+title+'</div>'
+      +'<p style="color:#5b6b7f;font-size:1rem;line-height:1.5;margin-bottom:20px;">'+msg+'</p>'
+      +'<button id="gate-recheck" style="background:#00459A;color:#fff;border:none;border-radius:999px;padding:10px 22px;font-weight:700;margin:0 6px;">Check again</button>'
+      +'<button id="gate-logout" style="background:#fff;color:#00459A;border:2px solid #00459A;border-radius:999px;padding:10px 22px;font-weight:700;margin:0 6px;">Log out</button></div>';
+    document.body.appendChild(d);
+    document.getElementById('gate-logout').onclick=function(){clearTokens();location.reload();};
+    document.getElementById('gate-recheck').onclick=async function(){const m=await me();if(m&&m.status==='Approved')location.reload();};
+  }
+  let feedBox=null;
+  function findFeed(){
+    if(feedBox&&document.contains(feedBox))return feedBox;
+    feedBox=document.getElementById('posts')||document.getElementById('feed')||document.getElementById('posts-list');
+    if(feedBox)return feedBox;
+    const els=document.querySelectorAll('div,p');
+    for(const el of els){if(el.textContent.trim()==='No posts yet. Be the first to share!'){feedBox=el.parentElement;return feedBox;}}
+    const hs=document.querySelectorAll('h1,h2,h3');
+    for(const h of hs){if(/Community Discussion/i.test(h.textContent)){const kids=h.parentElement.children;let last=null;for(const k of kids){if(k.tagName==='DIV')last=k;}if(last){feedBox=last;return feedBox;}}}
+    return null;
+  }
+  function idOf(node){if(node.dataset&&node.dataset.id)return node.dataset.id;const m=(node.innerHTML||'').match(/onclick="[^"]*?\(\s*(\d+)/);return m?m[1]:null;}
+  function injectReports(){
+    const box=findFeed();if(!box)return;
+    const withIds=box.querySelectorAll('[data-id]');
+    const cards=withIds.length?withIds:box.children;
+    const seen={};
+    for(const c of cards){
+      const pid=idOf(c);if(!pid||seen[pid])continue;seen[pid]=1;
+      if(c.querySelector('.report-btn'))continue;
+      const b=document.createElement('button');b.className='report-btn';b.textContent='Report';
+      b.style.cssText='background:none;border:none;color:#8a97a5;font-size:.78rem;text-decoration:underline;cursor:pointer;margin-left:8px;';
+      b.onclick=async function(){const reason=prompt('Why are you reporting this post?');if(!reason)return;
+        const r=await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({post_id:Number(pid),reason})});
+        alert(r.ok?'Report sent to the admin team. Thank you.':'Could not send report.');};
+      (c.querySelector('.post-actions')||c).appendChild(b);
+    }
+  }
+  async function gate(){
+    const m=await me();if(!m)return;
+    if(m.status==='Pending')overlay('Access Pending','Your access is Pending admin approval. Talk to DrWarren or his team.');
+    else if(m.status==='Banned')overlay('Account Banned','This account has been Banned. Talk to DrWarren or his team.');
+    else injectReports();
+  }
+  gate();
+  let q=false;
+  new MutationObserver(function(){if(q)return;q=true;requestAnimationFrame(function(){q=false;if(!document.getElementById('gate-overlay'))injectReports();});}).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
 </body>
 </html>
