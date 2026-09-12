@@ -79,7 +79,7 @@ async function handleApi(request, env, ctx, url) {
       return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin, status: user.status });
     } catch (e) { return json({ error: 'Our system hit a technical error during sign-in. Screenshot this message and send it to DrWarren or his team.' }, 500); }
   }
-   if (path === '/api/change-password' && method === 'POST') {
+  if (path === '/api/change-password' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
     const { currentPassword, newPassword, newName } = await request.json();
@@ -95,7 +95,6 @@ async function handleApi(request, env, ctx, url) {
       await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(cleanName, userId).run();
     }
     return json({ success: true });
-  }
   }
   if (path === '/api/me' && method === 'GET') {
     const userId = await auth(request, env);
