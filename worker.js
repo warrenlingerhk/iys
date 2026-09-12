@@ -108,7 +108,7 @@ async function handleApi(request, env, ctx, url) {
     if (!g.id) return json({ error: 'Please log in again.' }, 401);
     if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
     if (method === 'GET') {
-         const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at, u.last_seen,
+      const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(g.id).all();
       return json(res.results);
     }
     if (method === 'POST') {
@@ -200,7 +200,7 @@ async function handleApi(request, env, ctx, url) {
     const activeCount = activeLearners?.c || 0;
     const postsCount = totalPosts?.c || 0;
     const reportsCount = totalReports?.c || 0;
-       const lessonFinishers = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE type = 'lesson_completion' AND completed = 1").first();
+    const lessonFinishers = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE type = 'lesson_completion' AND completed = 1").first();
     const eliteRate = totalCount > 0 ? Math.round((lessonFinishers?.c || 0) / totalCount * 100) : 0;
     const engagement = totalCount > 0 ? (postsCount / totalCount).toFixed(1) : 0;
     const healthRatio = postsCount > 0 ? (reportsCount / postsCount).toFixed(2) : 0;
@@ -208,7 +208,7 @@ async function handleApi(request, env, ctx, url) {
   }
   if (path === '/api/admin/users' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at,
+    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at, u.last_seen,
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
