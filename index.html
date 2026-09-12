@@ -636,6 +636,13 @@ function renderCourse(){
     html += `<h1>Lesson ${lessonTone}: ${lessonName}</h1>`;
     html += `</div>`;
     html += `<div id="lesson-modules"></div>`;
+    html += `<div class="lesson-title-card" style="text-align:left;padding:24px 28px;">`;
+    html += `<div class="module-check-container" style="background:transparent;padding:0;justify-content:flex-start;">`;
+    html += `<input type="checkbox" id="lesson-check" onchange="triggerAutoSave()">`;
+    html += `<label for="lesson-check" style="color:var(--navy);">Mark Lesson ${lessonTone} as Complete</label>`;
+    html += `</div>`;
+    html += `<p id="lesson-hint" style="color:var(--slate);font-weight:700;font-size:.95rem;margin:10px 0 0;"></p>`;
+    html += `</div>`;
     html += `</div></div>`;
 
     host.innerHTML = html;
@@ -737,9 +744,31 @@ function renderCourse(){
     });
 
     loadProgress();
+    updateLessonCheck();
 }
 
-function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
+function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); updateLessonCheck(); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
+function updateLessonCheck(){
+  const lessonCheck = document.getElementById('lesson-check');
+  const hint = document.getElementById('lesson-hint');
+  if (!lessonCheck) return;
+  const mods = Array.from(document.querySelectorAll('[id^="module-check-"]'));
+  const answers = Array.from(document.querySelectorAll('.mod-item[data-format="answer"] .answer-input'));
+  const modsLeft = mods.filter(m => !m.checked).length;
+  const answersLeft = answers.filter(a => !a.value.trim()).length;
+  const unlocked = modsLeft === 0 && answersLeft === 0;
+  lessonCheck.disabled = !unlocked && !lessonCheck.checked;
+  if (hint) {
+    if (lessonCheck.checked) hint.innerText = 'Lesson marked complete. Great work!';
+    else if (unlocked) hint.innerText = 'All requirements met — you can mark this lesson complete.';
+    else {
+      const parts = [];
+      if (modsLeft > 0) parts.push(modsLeft + ' module' + (modsLeft > 1 ? 's' : '') + ' to check');
+      if (answersLeft > 0) parts.push(answersLeft + ' answer box' + (answersLeft > 1 ? 'es' : '') + ' to fill');
+      hint.innerText = 'Unlock by finishing: ' + parts.join(' and ') + '.';
+    }
+  }
+}
 function setStatus(text, cls){ const el = document.getElementById('save-status'); el.innerText = text; el.className = 'save-status ' + (cls || ''); }
 
 async function saveProgress(){
@@ -757,6 +786,19 @@ async function saveProgress(){
       note: ''
     });
   });
+
+  // 1b. Lesson completion checkbox
+  const lessonCheck = document.getElementById('lesson-check');
+  if (lessonCheck) {
+    progress.push({
+      item_id: (currentLessonId + '_lesson_complete').toLowerCase(),
+      header_name: 'Lesson',
+      format: 'lesson',
+      type: 'lesson_completion',
+      completed: lessonCheck.checked ? 1 : 0,
+      note: ''
+    });
+  }
 
   // 2. Mod items (Answers & Polls)
   document.querySelectorAll('.mod-item').forEach(item => {
@@ -827,9 +869,14 @@ async function loadProgress(){
       }
     });
 
+    const lessonSaved = data.find(s => s.type === 'lesson_completion' && s.item_id === (currentLessonId + '_lesson_complete').toLowerCase());
+    const lessonCheck = document.getElementById('lesson-check');
+    if (lessonCheck && lessonSaved) lessonCheck.checked = lessonSaved.completed === 1;
     setStatus('All changes saved.', '');
+    updateLessonCheck();
   } catch (e) {
     console.error('Error loading progress:', e);
+    updateLessonCheck();
   }
 }
 
@@ -846,6 +893,7 @@ async function parseCSV(text) {
   return rows;
 }
 
+setInterval(function(){ const t = localStorage.getItem('token'); if (t) fetch('/api/heartbeat', { headers:{'Authorization':'Bearer ' + t} }).catch(function(){}); }, 60000);
 showHome();
 </script>
 </body>
