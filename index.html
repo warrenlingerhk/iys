@@ -274,7 +274,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 
 <div id="change-password-modal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
   <div class="modal-box" style="text-align:left">
-    <h3>Change Password</h3>
+    <h3>Change Name or Password</h3>
+    <input type="text" id="cp-name" placeholder="New display name (leave blank to keep current)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-current" placeholder="Current Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-new" placeholder="New Password (8+ characters)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-new-confirm" placeholder="Confirm New Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
@@ -601,20 +602,27 @@ async function signup() {
 
 async function changePassword() {
   const errEl = document.getElementById('cp-error'); errEl.innerText = '';
+  const newName = document.getElementById('cp-name').value.trim();
   const currentPassword = document.getElementById('cp-current').value;
   const newPassword = document.getElementById('cp-new').value;
   const confirmNewPassword = document.getElementById('cp-new-confirm').value;
-  if (!currentPassword || !newPassword) { errEl.innerText = 'All fields are required.'; return; }
-  if (newPassword !== confirmNewPassword) { errEl.innerText = 'New passwords do not match.'; return; }
-  if (newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
+  if (!newName && !newPassword && !confirmNewPassword) { errEl.innerText = 'Enter a new name, a new password, or both.'; return; }
+  if (!currentPassword) { errEl.innerText = 'Please enter your current password.'; return; }
+  if ((newPassword || confirmNewPassword) && newPassword !== confirmNewPassword) { errEl.innerText = 'New passwords do not match.'; return; }
+  if (newPassword && newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
   try {
-    const res = await fetch(API_URL + '/api/change-password', { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ currentPassword, newPassword }) });
+    const res = await fetch(API_URL + '/api/change-password', { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ currentPassword, newPassword, newName }) });
     const data = await res.json();
-    if (data.success) { alert('Password changed!'); document.getElementById('change-password-modal').classList.add('hidden'); document.getElementById('cp-current').value=''; document.getElementById('cp-new').value=''; document.getElementById('cp-new-confirm').value=''; }
+    if (data.success) {
+      if (newName) localStorage.setItem('iys_name', newName);
+      alert(newName && newPassword ? 'Name and password updated!' : newName ? 'Name updated!' : 'Password changed!');
+      document.getElementById('change-password-modal').classList.add('hidden');
+      document.getElementById('cp-name').value=''; document.getElementById('cp-current').value=''; document.getElementById('cp-new').value=''; document.getElementById('cp-new-confirm').value='';
+      renderHeader();
+    }
     else { errEl.innerText = data.error || 'Failed.'; }
   } catch (e) { errEl.innerText = 'Network error.'; }
 }
-
 function linkify(text){
     return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" class="content-link">$1</a>');
