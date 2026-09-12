@@ -29,6 +29,9 @@
   .badge.m{background:var(--magenta);} .badge.r{background:var(--red);} .badge.p{background:var(--amber);} .badge.g{background:var(--green);}
   .chip{background:#eef2f7;border-radius:8px;padding:3px 9px;font-size:.72rem;font-weight:800;color:var(--navy);display:inline-block;}
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .dot.on{background:#1b7f3b;box-shadow:0 0 6px rgba(27,127,59,.7);}
+  .dot.off{background:#d3dce6;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
   .dot.on{background:var(--green);box-shadow:0 0 6px rgba(27,127,59,.7);}
   .dot.off{background:#d3dce6;}
   label.chk{display:flex;gap:6px;align-items:center;font-size:.82rem;color:var(--muted);font-weight:600;}
@@ -96,6 +99,7 @@ async function doLogin(){
 }
 async function act(path,body){const r=await api(path,{method:'POST',body});if(!r.ok){const j=await r.json();alert(j.error||'Action failed.');}loadAll();}
 function setStatus(id,status){act('/api/admin/status',{user_id:id,status});}
+function isOnline(ls){ if(!ls) return false; const t=Date.parse(String(ls).replace(' ','T')+'Z'); return !isNaN(t) && (Date.now()-t) < 5*60000; }
 async function loadAll(){
   const [stats,analytics,users,reports]=await Promise.all([
     getJSON('/api/admin/stats'),getJSON('/api/admin/analytics'),
@@ -117,7 +121,8 @@ async function loadAll(){
     const on=isOnline(u.last_seen);
     return `<div class="row"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
       <b>#${esc(u.member_number)} ${esc(u.name)}</b>
-      <span class="dot ${on?'on':'off'}" title="${on?'On the site now':'Last seen '+(u.last_seen||'never')}"></span>
+      <span class="dot ${isOnline(u.last_seen)?'on':'off'}" title="${isOnline(u.last_seen)?'On the site now':'Last seen '+(u.last_seen||'never')}"></span>
+      <span class="badge ${sb}">${esc(u.status||'Pending').toUpperCase()}</span>
       <span class="badge ${sb}">${esc(u.status||'Pending').toUpperCase()}</span>
       ${u.is_admin?'<span class="badge m">ADMIN</span>':''}
       <span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span>
