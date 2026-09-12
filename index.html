@@ -99,7 +99,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .expandable-content.expanded{max-height:2000px; padding:18px}
 .answer-box{margin-top:16px; background:var(--cream); padding:18px; border-radius:10px; border:2px solid var(--blue)}
 .answer-box label{display:block; font-weight:800; margin-bottom:8px; color:var(--navy)}
-.answer-input{width:100%; padding:12px 14px; border-radius:8px; border:2px solid var(--slate); font:inherit; font-size:1rem; min-height:100px; resize:vertical}
+.answer-input{width:100%; padding:12px 14px; border-radius:8px; border:2px solid var(--slate); font:inherit;font-size:1rem; min-height:100px; resize:vertical}
 .answer-input:focus{outline:none; border-color:var(--pink)}
 .poll-box{display:flex; flex-direction:column; gap:12px; background:#f0f8ff; padding:20px; border-radius:10px; margin:16px 0;}
 .poll-option{display:flex; align-items:center; gap:10px; font-weight:700; cursor:pointer; padding:8px; border-radius:6px;}
@@ -328,9 +328,47 @@ const LESSON_CSV_URLS = {
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
 
 function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
-function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); renderCommunity(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
+function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); renderCommunity(); refreshGate(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
 function showAuth(type) { hideAllViews(); document.getElementById(type === 'signup' ? 'view-auth-signup' : 'view-auth-login').classList.remove('hidden'); }
 function logout(){ localStorage.clear(); showHome(); }
+
+/* ---------- ACCESS GATE (Pending / Banned notice under the hero) ---------- */
+function clearGate(){
+  const n = document.getElementById('gate-notice'); if (n) n.remove();
+  const c = document.getElementById('community-section'); if (c) c.classList.remove('hidden');
+  const r = document.getElementById('rail-home'); if (r) r.classList.remove('hidden');
+}
+function applyGate(status){
+  clearGate();
+  const hero = document.querySelector('section.hero'); if (!hero) return;
+  const banned = status === 'Banned';
+  const d = document.createElement('div');
+  d.id = 'gate-notice'; d.className = 'card';
+  d.style.cssText = 'border:3px solid ' + (banned ? '#c62828' : '#D600D6') + ';border-radius:14px;padding:22px 24px;margin:18px 0;';
+  d.innerHTML = '<h2 style="font-size:1.3rem;font-weight:800;color:var(--navy);margin:0 0 8px;">' + (banned ? 'Account Banned' : 'Access Pending') + '</h2>'
+    + '<p style="color:var(--slate);font-weight:700;margin:0 0 14px;">' + (banned ? 'This account has been Banned. Talk to DrWarren or his team.' : 'Your access is Pending admin approval. Talk to DrWarren or his team.') + '</p>'
+    + (banned ? '' : '<button class="btn cta" style="margin-right:8px" onclick="checkAgain()">Check again</button>')
+    + '<button class="btn ghost" onclick="logout()">Log out</button>';
+  hero.insertAdjacentElement('afterend', d);
+  document.getElementById('community-section').classList.add('hidden');
+  document.getElementById('rail-home').classList.add('hidden');
+}
+async function refreshGate(){
+  const token = localStorage.getItem('token');
+  if (!token) { clearGate(); return; }
+  try {
+    const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + token} });
+    if (!r.ok) { clearGate(); return; }
+    const m = await r.json();
+    localStorage.setItem('iys_status', m.status || 'Approved');
+    if (m.status === 'Pending' || m.status === 'Banned') applyGate(m.status); else clearGate();
+  } catch (e) {}
+}
+async function checkAgain(){
+  await refreshGate();
+  if (localStorage.getItem('iys_status') === 'Approved') location.reload();
+  else alert('Still Pending. Talk to DrWarren or his team.');
+}
 
 function getGradient(tone) {
     if (tone >= 1 && tone <= 23) {
@@ -401,11 +439,18 @@ async function handleLessonClick(id, active){
   if (!localStorage.getItem('token')) { showAuth('login'); return; }
   const isAdmin = localStorage.getItem('iys_is_admin') === '1';
   if (isAdmin) { await loadLessonData(id); showCourse(); return; }
+  let status = localStorage.getItem('iys_status') || 'Approved';
   try {
-    const res = await fetch('/api/my-offers', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
-    if (res.ok && (await res.json()).includes('IYS Course')) { await loadLessonData(id); showCourse(); return; }
+    const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
+    if (r.ok) { status = (await r.json()).status || 'Approved'; localStorage.setItem('iys_status', status); }
   } catch (e) {}
-  alert('Contact the IYS team to get access to ' + id + '.');
+  if (status !== 'Approved') {
+    applyGate(status);
+    const n = document.getElementById('gate-notice');
+    if (n) n.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  await loadLessonData(id); showCourse();
 }
 
 function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); }
@@ -414,21 +459,16 @@ async function loadLessonData(id) {
     currentLessonId = id;
     const lessonInfo = LESSONS.find(l => l.id === id);
     document.getElementById('course-content').innerHTML = '<p style="padding:40px;text-align:center">Loading lesson...</p>';
-    
     try {
         const csvUrl = LESSON_CSV_URLS[id];
-        
         if (!csvUrl || csvUrl.includes('PASTE_')) {
             document.getElementById('course-content').innerHTML = `<p style="padding:40px;text-align:center;color:var(--navy);font-weight:700">Lesson ${id} content is being prepared.<br><br>(The CSV link for ${id} needs to be added to the code.)</p>`;
             return;
         }
-        
         const res = await fetch(csvUrl);
         if (!res.ok) throw new Error('Failed to load CSV');
         const csvText = await res.text();
-        
         const rows = await parseCSV(csvText);
-        
         COURSE_DATA = rows.slice(1);
         COURSE_DATA.lessonInfo = lessonInfo;
         renderCourse();
@@ -454,7 +494,7 @@ async function renderCommunity(){
     const res = await fetch('/api/posts', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
     if (!res.ok) throw new Error();
     const posts = await res.json();
-    if (!posts.length) { host.innerHTML = '<p style="text-align:center;color:var(--slate);font-weight:700">No posts yet. Be the first to share!</p>'; return; }
+    if (!posts.length) { host.innerHTML = '<p style="text-align:center;font-weight:700;color:var(--slate)">No posts yet. Be the first to share!</p>'; return; }
     host.innerHTML = posts.map(p => postHtml(p, false)).join('');
   } catch(e) { host.innerHTML = '<p style="color:red">Failed to load discussion.</p>'; }
 }
@@ -473,7 +513,7 @@ function postHtml(p, isReply){
       <button class="post-btn" onclick="toggleLike(${p.id})">${p.user_liked ? '💙' : '🤍'} ${p.like_count}</button>
       ${!isReply ? `<button class="post-btn" onclick="toggleReplyBox(${p.id})">Reply</button>` : ''}
       <button class="post-btn" onclick="reportPost(${p.id})">Report</button>
-      ${isAdmin ? `<button class="post-btn admin" onclick="adminPin(${p.id})">${p.pinned ? 'Unpin' : 'Pin'}</button><button class="post-btn admin" onclick="adminDelete(${p.id})">Delete</button><button class="post-btn admin" onclick="adminBan(${p.author_id})">Ban</button>` : ''}
+      ${isAdmin ? `<button class="post-btn admin" onclick="adminPin(${p.id})">${p.pinned ? 'Unpin' : 'Pin'}</button><button class="post-btn admin" onclick="adminDelete(${p.id})">Delete</button>` : ''}
     </div>
     ${!isReply ? `
       <div class="reply-box hidden" id="reply-box-${p.id}">
@@ -520,11 +560,6 @@ async function adminPin(id){
   await fetch('/api/posts/pin', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ post_id: id }) });
   renderCommunity();
 }
-async function adminBan(userId){
-  if (!confirm('Ban this classmate? They will no longer be able to log in.')) return;
-  await fetch('/api/users/ban', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ user_id: userId }) });
-  renderCommunity();
-}
 
 async function login() {
   const errEl = document.getElementById('login-error'); errEl.innerText = '';
@@ -537,6 +572,7 @@ async function login() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('iys_is_admin', data.is_admin);
       localStorage.setItem('iys_name', data.name || email.split('@')[0]);
+      localStorage.setItem('iys_status', data.status || 'Approved');
       showHome();
     } else { errEl.innerText = data.error || 'Error.'; }
   } catch (e) { errEl.innerText = 'Network error.'; }
@@ -557,6 +593,7 @@ async function signup() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('iys_is_admin', data.is_admin);
       localStorage.setItem('iys_name', name);
+      localStorage.setItem('iys_status', data.status || 'Pending');
       showHome();
     } else { errEl.innerText = data.error || 'Error.'; }
   } catch (e) { errEl.innerText = 'Network error.'; }
@@ -657,7 +694,7 @@ function renderCourse(){
 
             if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
 
-            // PitchCamp clean ID slug
+            // Clean ID slug
             const id = (currentLessonId + '_' + title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
             const div = document.createElement('div');
@@ -775,7 +812,7 @@ async function loadProgress(){
         }
       }
 
-      // 2. Restore items by data-id (PitchCamp style)
+      // 2. Restore items by data-id
       const item = document.querySelector('.mod-item[data-id="' + saved.item_id + '"]');
       if (item) {
         if (saved.type === 'answer') {
@@ -810,67 +847,6 @@ async function parseCSV(text) {
 }
 
 showHome();
-</script>
-<script>
-/* IYS access gate + report buttons */
-(function(){
-  const KEYS=['iys_token','token','pc_token','pitchcamp_token'];
-  const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let TOKEN='';
-  function tokenList(){const c=[];for(const k of KEYS){const v=localStorage.getItem(k);if(v&&UUID.test(v)&&!c.includes(v))c.push(v);}for(let i=0;i<localStorage.length;i++){const v=localStorage.getItem(localStorage.key(i));if(v&&UUID.test(v)&&!c.includes(v))c.push(v);}return c;}
-  async function me(){for(const t of tokenList()){try{const r=await fetch('/api/me',{headers:{'Authorization':'Bearer '+t}});if(r.ok){TOKEN=t;return await r.json();}}catch(e){}}return null;}
-  function clearTokens(){const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);const v=localStorage.getItem(k);if(v&&UUID.test(v))ks.push(k);}ks.forEach(k=>localStorage.removeItem(k));}
-  function overlay(title,msg){
-    if(document.getElementById('gate-overlay'))return;
-    const d=document.createElement('div');d.id='gate-overlay';
-    d.style.cssText='position:fixed;inset:0;background:#f0f2f5;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
-    d.innerHTML='<div style="max-width:440px;background:#fff;border-radius:14px;padding:32px;box-shadow:0 6px 20px rgba(0,20,60,.15);text-align:center;font-family:Segoe UI,system-ui,sans-serif;">'
-      +'<div style="font-size:1.6rem;font-weight:800;color:#00459A;margin-bottom:12px;">'+title+'</div>'
-      +'<p style="color:#5b6b7f;font-size:1rem;line-height:1.5;margin-bottom:20px;">'+msg+'</p>'
-      +'<button id="gate-recheck" style="background:#00459A;color:#fff;border:none;border-radius:999px;padding:10px 22px;font-weight:700;margin:0 6px;">Check again</button>'
-      +'<button id="gate-logout" style="background:#fff;color:#00459A;border:2px solid #00459A;border-radius:999px;padding:10px 22px;font-weight:700;margin:0 6px;">Log out</button></div>';
-    document.body.appendChild(d);
-    document.getElementById('gate-logout').onclick=function(){clearTokens();location.reload();};
-    document.getElementById('gate-recheck').onclick=async function(){const m=await me();if(m&&m.status==='Approved')location.reload();};
-  }
-  let feedBox=null;
-  function findFeed(){
-    if(feedBox&&document.contains(feedBox))return feedBox;
-    feedBox=document.getElementById('posts')||document.getElementById('feed')||document.getElementById('posts-list');
-    if(feedBox)return feedBox;
-    const els=document.querySelectorAll('div,p');
-    for(const el of els){if(el.textContent.trim()==='No posts yet. Be the first to share!'){feedBox=el.parentElement;return feedBox;}}
-    const hs=document.querySelectorAll('h1,h2,h3');
-    for(const h of hs){if(/Community Discussion/i.test(h.textContent)){const kids=h.parentElement.children;let last=null;for(const k of kids){if(k.tagName==='DIV')last=k;}if(last){feedBox=last;return feedBox;}}}
-    return null;
-  }
-  function idOf(node){if(node.dataset&&node.dataset.id)return node.dataset.id;const m=(node.innerHTML||'').match(/onclick="[^"]*?\(\s*(\d+)/);return m?m[1]:null;}
-  function injectReports(){
-    const box=findFeed();if(!box)return;
-    const withIds=box.querySelectorAll('[data-id]');
-    const cards=withIds.length?withIds:box.children;
-    const seen={};
-    for(const c of cards){
-      const pid=idOf(c);if(!pid||seen[pid])continue;seen[pid]=1;
-      if(c.querySelector('.report-btn'))continue;
-      const b=document.createElement('button');b.className='report-btn';b.textContent='Report';
-      b.style.cssText='background:none;border:none;color:#8a97a5;font-size:.78rem;text-decoration:underline;cursor:pointer;margin-left:8px;';
-      b.onclick=async function(){const reason=prompt('Why are you reporting this post?');if(!reason)return;
-        const r=await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:JSON.stringify({post_id:Number(pid),reason})});
-        alert(r.ok?'Report sent to the admin team. Thank you.':'Could not send report.');};
-      (c.querySelector('.post-actions')||c).appendChild(b);
-    }
-  }
-  async function gate(){
-    const m=await me();if(!m)return;
-    if(m.status==='Pending')overlay('Access Pending','Your access is Pending admin approval. Talk to DrWarren or his team.');
-    else if(m.status==='Banned')overlay('Account Banned','This account has been Banned. Talk to DrWarren or his team.');
-    else injectReports();
-  }
-  gate();
-  let q=false;
-  new MutationObserver(function(){if(q)return;q=true;requestAnimationFrame(function(){q=false;if(!document.getElementById('gate-overlay'))injectReports();});}).observe(document.body,{childList:true,subtree:true});
-})();
 </script>
 </body>
 </html>
