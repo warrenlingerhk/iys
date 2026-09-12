@@ -108,7 +108,7 @@ async function handleApi(request, env, ctx, url) {
     if (!g.id) return json({ error: 'Please log in again.' }, 401);
     if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
     if (method === 'GET') {
-          const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at, u.last_seen,
+         const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at, u.last_seen,
       return json(res.results);
     }
     if (method === 'POST') {
