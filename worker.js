@@ -48,17 +48,20 @@ async function handleApi(request, env, ctx, url) {
   }
 
   // --- AUTH ---
-  if (path === '/api/signup' && method === 'POST') {
+ if (path === '/api/signup' && method === 'POST') {
     const { name, email, password } = await request.json();
-    if (!email || !password || String(password).length < 8)
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail || !password || String(password).length < 8)
       return json({ error: 'Email and password (8+ chars) required.' }, 400);
+    const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
+    if (existing) return json({ error: 'That email is already registered. Please log in instead.' }, 409);
     const hash = await hashPassword(password);
     const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
     const nextUserNumber = Math.max(102, (maxUser?.max_num || 0) + 1);
     try {
-      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, is_paid, created_at) VALUES (?, ?, ?, ?, 0, datetime('now'))").bind(email.toLowerCase(), hash, name, nextUserNumber).run();
-    } catch (e) { return json({ error: 'That email is already registered.' }, 409); }
-    const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(email.toLowerCase()).first();
+      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, is_paid, created_at) VALUES (?, ?, ?, ?, 0, datetime('now'))").bind(cleanEmail, hash, String(name || '').trim(), nextUserNumber).run();
+    } catch (e) { return json({ error: 'Sign-up failed: ' + e.message }, 500); }
+    const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(cleanEmail).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
     return json({ token, name: user.name, user_number: user.user_number, is_admin: 0 });
