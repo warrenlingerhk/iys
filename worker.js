@@ -79,15 +79,23 @@ async function handleApi(request, env, ctx, url) {
       return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin, status: user.status });
     } catch (e) { return json({ error: 'Our system hit a technical error during sign-in. Screenshot this message and send it to DrWarren or his team.' }, 500); }
   }
-  if (path === '/api/change-password' && method === 'POST') {
+   if (path === '/api/change-password' && method === 'POST') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in again.' }, 401);
-    const { currentPassword, newPassword } = await request.json();
+    const { currentPassword, newPassword, newName } = await request.json();
+    const cleanName = String(newName || '').trim();
+    if (!cleanName && !newPassword) return json({ error: 'Enter a new name, a new password, or both.' }, 400);
     const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
     if (!user || user.password !== await hashPassword(currentPassword || '')) return json({ error: 'Current password is incorrect.' }, 400);
-    if (!newPassword || String(newPassword).length < 8) return json({ error: 'New password must be 8+ characters.' }, 400);
-    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(await hashPassword(newPassword), userId).run();
+    if (newPassword) {
+      if (String(newPassword).length < 8) return json({ error: 'New password must be 8+ characters.' }, 400);
+      await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(await hashPassword(newPassword), userId).run();
+    }
+    if (cleanName) {
+      await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(cleanName, userId).run();
+    }
     return json({ success: true });
+  }
   }
   if (path === '/api/me' && method === 'GET') {
     const userId = await auth(request, env);
