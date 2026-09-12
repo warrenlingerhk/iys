@@ -23,6 +23,7 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
       "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
       "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Approved'",
+      "ALTER TABLE users ADD COLUMN last_seen DATETIME",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
       "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
     ];
@@ -93,6 +94,12 @@ async function handleApi(request, env, ctx, url) {
     if (!userId) return json({ error: 'Please log in.' }, 401);
     const user = await env.DB.prepare('SELECT name, is_admin, user_number, status FROM users WHERE id = ?').bind(userId).first();
     return json(user);
+  }
+  if (path === '/api/heartbeat' && method === 'GET') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    try { await env.DB.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(userId).run(); } catch (e) {}
+    return json({ ok: true });
   }
 
   // --- PROGRESS ---
@@ -180,13 +187,8 @@ async function handleApi(request, env, ctx, url) {
     const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
     const posts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
     const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
-    const mod1 = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE completed = 1 AND (item_id LIKE '%module-1' OR item_id LIKE '%module_1%')").first();
-    return json({ users: users?.c || 0, posts: posts?.c || 0, reports: reports?.c || 0, mod1: mod1?.c || 0 });
-  }
-  if (path === '/api/admin/pending' && method === 'GET') {
-    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare("SELECT id, name, email, user_number as member_number, created_at FROM users WHERE status = 'Pending' ORDER BY created_at ASC").all();
-    return json(res.results);
+    const active = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE last_seen >= datetime('now', '-5 minutes')").first();
+    return json({ users: users?.c || 0, posts: posts?.c || 0, reports: reports?.c || 0, active: active?.c || 0 });
   }
   if (path === '/api/admin/analytics' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
@@ -205,7 +207,11 @@ async function handleApi(request, env, ctx, url) {
   }
   if (path === '/api/admin/users' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare('SELECT id, name, email, user_number as member_number, is_admin, status, created_at FROM users ORDER BY user_number ASC').all();
+    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at,
+      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+      FROM users u ORDER BY u.user_number ASC`).all();
     return json(res.results);
   }
   if (path === '/api/admin/status' && method === 'POST') {
