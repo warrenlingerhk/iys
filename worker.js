@@ -24,6 +24,7 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
       "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Approved'",
       "ALTER TABLE users ADD COLUMN last_seen DATETIME",
+      "ALTER TABLE users ADD COLUMN welcomed INTEGER DEFAULT 0",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
       "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
     ];
@@ -99,8 +100,14 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/me' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT name, is_admin, user_number, status FROM users WHERE id = ?').bind(userId).first();
+    const user = await env.DB.prepare('SELECT name, is_admin, user_number, status, welcomed FROM users WHERE id = ?').bind(userId).first();
     return json(user);
+  }
+  if (path === '/api/welcome-seen' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    await env.DB.prepare('UPDATE users SET welcomed = 1 WHERE id = ?').bind(userId).run();
+    return json({ success: true });
   }
   if (path === '/api/heartbeat' && method === 'GET') {
     const userId = await auth(request, env);
