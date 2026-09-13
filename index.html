@@ -268,11 +268,16 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
     <div class="auth-card card" style="width:min(560px,94%)">
       <div class="auth-band">Welcome to Influence Your Success</div>
       <div class="auth-body" style="text-align:left">
-        <h3 style="margin:0 0 10px;color:var(--navy);font-size:1.3rem">Thank you for joining us, <span id="welcome-name">Classmate</span>!</h3>
-        <p style="margin:0 0 14px;color:var(--slate);font-weight:600;line-height:1.6">Your place on the Advanced Certificate in Life Coaching (HKU SPACE) programme is now confirmed, and we are delighted to welcome you. Thank you for becoming part of our community — your classmates and coaches are looking forward to learning with you.</p>
+        <h3 style="margin:0 0 10px;color:var(--navy);font-size:1.3rem">Thank you for joining influenceyoursuccess.com, <span id="welcome-name">Classmate</span>!</h3>
+        <p style="margin:0 0 12px;color:var(--slate);font-weight:600;line-height:1.6">This site is exclusively for students and alumni of DrWarren's cohorts of the Advanced Certificate in Life Coaching course.</p>
+        <p style="margin:0 0 14px;color:var(--slate);font-weight:600;line-height:1.6">Thank you for contributing to our community we are looking forward to learning with you.</p>
         <div style="background:var(--cream);border:2px solid var(--lightBlue);border-radius:10px;padding:14px 16px;margin:0 0 16px">
-          <p style="margin:0 0 8px;font-weight:800;color:var(--navy)">How to change your member name or password</p>
-          <p style="margin:0;color:var(--slate);font-weight:600;line-height:1.6">Click the pill at the top right of the screen that shows your name and member number (next to the Log out button). This opens the <b>Change Name or Password</b> box. Type a new display name in the first field, and/or a new password in the password fields, then enter your current password and press <b>Update</b>. Your new name will appear on your pill and on everything you post in the community.</p>
+          <p style="margin:0 0 10px;font-weight:800;color:var(--navy)">How to change your member name or password</p>
+          <ol style="margin:0;padding-left:20px;color:var(--slate);font-weight:600;line-height:1.6">
+            <li style="margin-bottom:12px">Click the pill with <b id="welcome-pill">Sally 103</b> in the <b>top right of screen</b> (next to the Log out button).</li>
+            <li style="margin-bottom:12px">This opens the <b>Change Name or Password box</b>.</li>
+            <li style="margin-bottom:0">Type a new display name (if you would like) in the first field, and/or a new password in the password fields, then enter your current password and press Update.</li>
+          </ol>
         </div>
         <button class="btn cta" style="width:100%" onclick="enterSite()">Enter the site</button>
       </div>
@@ -394,7 +399,10 @@ async function checkAgain(){
 /* ---------- WELCOME SCREEN (first sign-in after approval) ---------- */
 function showWelcome(){
   hideAllViews();
-  document.getElementById('welcome-name').innerText = localStorage.getItem('iys_name') || 'Classmate';
+  const nm = localStorage.getItem('iys_name') || 'Classmate';
+  const num = localStorage.getItem('iys_number') || '';
+  document.getElementById('welcome-name').innerText = nm;
+  document.getElementById('welcome-pill').innerText = num ? (nm + ' ' + num) : nm;
   document.getElementById('view-welcome').classList.remove('hidden');
 }
 async function enterSite(){
