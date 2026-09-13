@@ -263,6 +263,23 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
   </div>
 </div>
 
+<div id="view-welcome" class="hidden">
+  <div class="auth-wrap">
+    <div class="auth-card card" style="width:min(560px,94%)">
+      <div class="auth-band">Welcome to Influence Your Success</div>
+      <div class="auth-body" style="text-align:left">
+        <h3 style="margin:0 0 10px;color:var(--navy);font-size:1.3rem">Thank you for joining us, <span id="welcome-name">Classmate</span>!</h3>
+        <p style="margin:0 0 14px;color:var(--slate);font-weight:600;line-height:1.6">Your place on the Advanced Certificate in Life Coaching (HKU SPACE) programme is now confirmed, and we are delighted to welcome you. Thank you for becoming part of our community — your classmates and coaches are looking forward to learning with you.</p>
+        <div style="background:var(--cream);border:2px solid var(--lightBlue);border-radius:10px;padding:14px 16px;margin:0 0 16px">
+          <p style="margin:0 0 8px;font-weight:800;color:var(--navy)">How to change your member name or password</p>
+          <p style="margin:0;color:var(--slate);font-weight:600;line-height:1.6">Click the pill at the top right of the screen that shows your name and member number (next to the Log out button). This opens the <b>Change Name or Password</b> box. Type a new display name in the first field, and/or a new password in the password fields, then enter your current password and press <b>Update</b>. Your new name will appear on your pill and on everything you post in the community.</p>
+        </div>
+        <button class="btn cta" style="width:100%" onclick="enterSite()">Enter the site</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="view-course" class="hidden">
   <nav class="module-menu">
     <a href="#" class="back-home" onclick="showHome();return false;">&larr; Back</a>
@@ -328,7 +345,7 @@ const LESSON_CSV_URLS = {
 
 let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
 
-function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course'].forEach(v => document.getElementById(v).classList.add('hidden')); }
+function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course','view-welcome'].forEach(v => document.getElementById(v).classList.add('hidden')); }
 function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); renderCommunity(); refreshGate(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
 function showAuth(type) { hideAllViews(); document.getElementById(type === 'signup' ? 'view-auth-signup' : 'view-auth-login').classList.remove('hidden'); }
 function logout(){ localStorage.clear(); showHome(); }
@@ -363,13 +380,26 @@ async function refreshGate(){
     const m = await r.json();
     localStorage.setItem('iys_status', m.status || 'Approved');
     if (m.user_number) { localStorage.setItem('iys_number', m.user_number); renderHeader(); }
-    if (m.status === 'Pending' || m.status === 'Banned') applyGate(m.status); else clearGate();
+    if (m.status === 'Pending' || m.status === 'Banned') applyGate(m.status);
+    else if (m.welcomed === 0) showWelcome();
+    else clearGate();
   } catch (e) {}
 }
 async function checkAgain(){
   await refreshGate();
   if (localStorage.getItem('iys_status') === 'Approved') location.reload();
   else alert('Still Pending. Talk to DrWarren or his team.');
+}
+
+/* ---------- WELCOME SCREEN (first sign-in after approval) ---------- */
+function showWelcome(){
+  hideAllViews();
+  document.getElementById('welcome-name').innerText = localStorage.getItem('iys_name') || 'Classmate';
+  document.getElementById('view-welcome').classList.remove('hidden');
+}
+async function enterSite(){
+  try { await fetch('/api/welcome-seen', { method:'POST', headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} }); } catch (e) {}
+  showHome();
 }
 
 function getGradient(tone) {
