@@ -276,7 +276,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
           <ol style="margin:0;padding-left:20px;color:var(--slate);font-weight:600;line-height:1.6">
             <li style="margin-bottom:12px">Click the pill with <b id="welcome-pill">Sally 103</b> in the <b>top right of screen</b> (next to the Log out button).</li>
             <li style="margin-bottom:12px">This opens the <b>Change Name or Password box</b>.</li>
-            <li style="margin-bottom:0">Type a new display name (if you would like) in the first field, and/or a new password in the password fields, then enter your current password and press Update.</li>
+            <li style="margin-bottom:0">Enter your current password in the first field, then type a new display name (if you would like) and/or a new password in the password fields, and press Update.</li>
           </ol>
         </div>
         <button class="btn cta" style="width:100%" onclick="enterSite()">Enter the site</button>
@@ -297,8 +297,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 <div id="change-password-modal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
   <div class="modal-box" style="text-align:left">
     <h3>Change Name or Password</h3>
-    <input type="text" id="cp-name" placeholder="New display name (leave blank to keep current)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-current" placeholder="Current Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
+    <input type="text" id="cp-name" placeholder="New display name (leave blank to keep current)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-new" placeholder="New Password (8+ characters)" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <input type="password" id="cp-new-confirm" placeholder="Confirm New Password" style="width:100%;padding:11px;border-radius:10px;border:2px solid var(--slate);margin-bottom:10px">
     <p class="form-error" id="cp-error" style="text-align:center"></p>
