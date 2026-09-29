@@ -65,7 +65,8 @@ async function handleApi(request, env, ctx, url) {
     const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(cleanEmail).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
-    ctx.waitUntil(syncMember(env, { email: cleanEmail, name: String(name || '').trim(), joined: new Date().toISOString().slice(0, 10), status: 'Pending', user_number: nextUserNumber }));
+    const mrow = await memberRow(env, user.id);
+    if (mrow) ctx.waitUntil(syncMember(env, mrow));
     return json({ token, name: user.name, user_number: user.user_number, is_admin: 0, status: 'Pending' });
   }
   if (path === '/api/login' && method === 'POST') {
@@ -95,8 +96,8 @@ async function handleApi(request, env, ctx, url) {
     }
     if (cleanName) {
       await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(cleanName, userId).run();
-      const row = await env.DB.prepare('SELECT email, created_at, status, user_number FROM users WHERE id = ?').bind(userId).first();
-      if (row) ctx.waitUntil(syncMember(env, { email: row.email, name: cleanName, joined: (row.created_at || '').slice(0, 10), status: row.status, user_number: row.user_number }));
+      const row = await memberRow(env, userId);
+      if (row) { row.name = cleanName; ctx.waitUntil(syncMember(env, row)); }
     }
     return json({ success: true });
   }
@@ -239,17 +240,19 @@ async function handleApi(request, env, ctx, url) {
     if (!['Pending', 'Approved', 'Banned'].includes(status)) return json({ error: 'Unknown status.' }, 400);
     if (Number(user_id) === Number(adminId)) return json({ error: 'You cannot change your own status.' }, 400);
     await env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(status, user_id).run();
-    const row = await env.DB.prepare('SELECT email, name, created_at, user_number FROM users WHERE id = ?').bind(user_id).first();
-    if (row) ctx.waitUntil(syncMember(env, { email: row.email, name: row.name, joined: (row.created_at || '').slice(0, 10), status: status, user_number: row.user_number }));
+    const row = await memberRow(env, user_id);
+    if (row) ctx.waitUntil(syncMember(env, row));
     return json({ success: true });
   }
   if (path === '/api/admin/sync-members' && method === 'POST') {
     const adminId = await requireAdmin(request, env);
     if (!adminId) return json({ error: 'Forbidden' }, 403);
-    const all = await env.DB.prepare('SELECT email, name, created_at, status, user_number FROM users').all();
-    for (const u of all.results) {
-      await syncMember(env, { email: u.email, name: u.name, joined: (u.created_at || '').slice(0, 10), status: u.status, user_number: u.user_number });
-    }
+    const all = await env.DB.prepare(`SELECT u.id, u.email, u.name, u.created_at, u.status, u.user_number,
+      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+      FROM users u`).all();
+    for (const u of all.results) { await syncMember(env, u); }
     return json({ success: true, count: all.results.length });
   }
   if (path === '/api/admin/set-admin' && method === 'POST') {
@@ -289,6 +292,13 @@ async function handleApi(request, env, ctx, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
+async function memberRow(env, userId) {
+  return await env.DB.prepare(`SELECT u.email, u.name, u.created_at, u.status, u.user_number,
+    (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+    FROM users u WHERE u.id = ?`).bind(userId).first();
+}
 async function gateUser(request, env) {
   const userId = await auth(request, env);
   if (!userId) return { id: null, status: null };
@@ -329,13 +339,23 @@ async function syncSheet(webhookUrl, email, name, user_number, lesson, progress)
     });
   } catch (e) {}
 }
-async function syncMember(env, m) {
-  if (!env.AMS_WEBHOOK_URL) return;
+async function syncMember(env, u) {
+  if (!env.AMS_WEBHOOK_URL || !u) return;
   try {
     await fetch(env.AMS_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ type: 'member', email: m.email, name: m.name, joined: m.joined, status: m.status, user_number: m.user_number })
+      body: JSON.stringify({
+        type: 'member',
+        email: u.email,
+        name: u.name,
+        joined: (u.created_at || '').slice(0, 10),
+        status: u.status,
+        user_number: u.user_number,
+        posts: u.post_count || 0,
+        modules: u.modules_done || 0,
+        lessons: u.lessons_done || 0
+      })
     });
   } catch (e) {}
 }
