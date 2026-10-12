@@ -114,6 +114,24 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .module-check-container{padding:20px 30px; display:flex; align-items:center; justify-content:center; gap:12px; background:rgba(255,255,255,0.3)}
 .module-check-container input{width:28px; height:28px; accent-color:var(--pink); cursor:pointer}
 .module-check-container label{font-weight:800; font-size:1.1rem; cursor:pointer; color:#fff}
+.anim-card{background:#fff;border:2px solid var(--lightBlue);border-radius:14px;padding:18px 20px;margin:12px 0;}
+.anim-title{font-size:1.15rem;font-weight:800;color:var(--navy);margin:0 0 10px;}
+.anim-stage{min-height:60px;}
+.anim-step{display:flex;gap:12px;align-items:flex-start;margin:10px 0;opacity:0;transform:translateY(8px);transition:opacity .5s ease, transform .5s ease;}
+.anim-step.show{opacity:1;transform:none;}
+.anim-ico{flex:0 0 34px;width:34px;height:34px;border-radius:50%;background:var(--lightBlue);color:var(--navy);display:flex;align-items:center;justify-content:center;}
+.anim-ico svg{width:20px;height:20px;}
+.anim-step p{margin:0;font-size:1.05rem;line-height:1.5;color:var(--navy);font-weight:600;padding-top:5px;}
+.anim-panel{border:2px solid var(--lightBlue);border-radius:10px;margin:12px 0 0;overflow:hidden;max-height:0;opacity:0;transition:max-height .6s ease, opacity .6s ease;}
+.anim-panel.show{max-height:600px;opacity:1;}
+.anim-panel-h{background:var(--lightBlue);color:var(--navy);padding:10px 14px;font-weight:800;}
+.anim-panel-b{padding:12px 14px;}
+.anim-panel-b p{margin:0 0 10px;color:var(--slate);font-weight:600;line-height:1.6;opacity:0;transition:opacity .6s ease;}
+.anim-panel-b p.show{opacity:1;}
+.anim-end{margin:12px 0 0;font-weight:800;color:var(--pink);opacity:0;transition:opacity .6s ease;}
+.anim-end.show{opacity:1;}
+.anim-controls{margin-top:12px;}
+.anim-missing{background:var(--cream);border:2px dashed var(--slate);border-radius:10px;padding:14px;color:var(--slate);font-weight:700;}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
 @media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
@@ -314,6 +332,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
   <div class="wrap"><p style="margin:0;font-size:.9rem;opacity:.8">©2026 Influence Your Success.</p></div>
 </footer>
 
+<script src="/animations/engine.js"></script>
 <script>
 const API_URL = '';
 
@@ -786,10 +805,13 @@ function renderCourse(){
                 div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
             } else if (type === 'title') {
                 div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
+            } else if (type === 'animation') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="anim-host"></div>`;
             } else {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
             }
             itemsHost.appendChild(div);
+            if (type === 'animation' && window.IYS_ANIM && window.IYS_ANIM.mount) window.IYS_ANIM.mount(div.querySelector('.anim-host'), content);
         });
     });
 
