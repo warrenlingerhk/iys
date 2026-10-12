@@ -11,11 +11,18 @@
     cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 15a4 4 0 1 1 .5-7.9A5 5 0 0 1 17 8a3.5 3.5 0 0 1 0 7H7z"/><path d="M12 12v6m0 0l-2-2m2 2l2-2"/></svg>',
     eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></svg>',
     bridge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17h18M5 17V9m14 8V9M3 9c3 3 6 4 9 4s6-1 9-4"/></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>'
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+    spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
+    steps: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4v-4h4v-4h4V8h4"/></svg>',
+    flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4m0 1h13l-3 4 3 4H5"/></svg>'
   };
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function reduced() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  function iconFor(ic) {
+    if (typeof ic === 'string' && ic.indexOf('<svg') === 0) return ic;
+    return ICONS[ic] || ICONS.check;
+  }
 
   function build(host, scene) {
     host.innerHTML = '';
@@ -27,7 +34,7 @@
     const controls = card.querySelector('.anim-controls');
     (scene.steps || []).forEach(function (st) {
       const d = document.createElement('div'); d.className = 'anim-step';
-      d.innerHTML = '<span class="anim-ico">' + (ICONS[st.icon] || ICONS.check) + '</span><p>' + esc(st.text || '') + '</p>';
+      d.innerHTML = '<span class="anim-ico">' + iconFor(st.icon) + '</span><p>' + esc(st.text || '') + '</p>';
       stage.appendChild(d);
     });
     if (scene.panel) {
