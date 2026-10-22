@@ -26,7 +26,8 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE users ADD COLUMN last_seen DATETIME",
       "ALTER TABLE users ADD COLUMN welcomed INTEGER DEFAULT 0",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
-      "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+      "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)"
     ];
     for (const s of statements) {
       try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
@@ -61,7 +62,12 @@ async function handleApi(request, env, ctx, url) {
     const nextUserNumber = Math.max(102, (maxUser?.max_num || 0) + 1);
     try {
       await env.DB.prepare("INSERT INTO users (email, password, name, user_number, status, created_at) VALUES (?, ?, ?, ?, 'Pending', datetime('now'))").bind(cleanEmail, hash, String(name || '').trim(), nextUserNumber).run();
-    } catch (e) { return json({ error: 'Sign-up failed: ' + e.message }, 500); }
+    } catch (e) {
+      if (String(e.message || '').indexOf('UNIQUE') !== -1) {
+        return json({ error: 'That email is already registered. Please log in instead, or ask DrWarren or his team to reset your password.' }, 409);
+      }
+      return json({ error: 'Sign-up failed: ' + e.message }, 500);
+    }
     const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(cleanEmail).first();
     const token = crypto.randomUUID();
     await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
