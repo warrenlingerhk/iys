@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,7 +56,7 @@
   <h2 style="margin-top:0;font-size:1.6rem;">Admin Dashboard</h2>
   <div class="cards" id="stats"></div>
   <h2>Analytics</h2><div class="cards" id="analytics"></div>
-  <h2 style="display:flex;justify-content:space-between;align-items:center;gap:10px;">Classmates — full member list <button class="btn-ghost" style="font-size:.75rem;padding:6px 12px;" onclick="act('/api/admin/sync-members',{})">Sync Members Sheet</button></h2><div id="members"></div>
+  <h2 style="display:flex;justify-content:space-between;align-items:center;gap:10px;">Classmates — full member list <button id="sync-members-btn" class="btn-ghost" style="font-size:.75rem;padding:6px 12px;" onclick="syncMembers()">Sync Members Sheet</button></h2><div id="members"></div>
   <h2>Reports</h2><div id="reports"></div>
 </div>
 
@@ -94,6 +96,18 @@ async function doLogin(){
 }
 async function act(path,body){const r=await api(path,{method:'POST',body});if(!r.ok){const j=await r.json();alert(j.error||'Action failed.');}loadAll();}
 function setStatus(id,status){act('/api/admin/status',{user_id:id,status});}
+async function syncMembers(){
+  const btn=document.getElementById('sync-members-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Syncing…'; }
+  try{
+    const r=await api('/api/admin/sync-members',{});
+    const j=await r.json().catch(function(){return {};});
+    if(!r.ok){ alert(j.error||'Sync failed.'); }
+    else { alert('Sheet updated: '+(j.count!=null?j.count+' member rows synced.':'done')); }
+  }catch(e){ alert('Sync failed: '+e.message); }
+  if(btn){ btn.disabled=false; btn.textContent='Sync Members Sheet'; }
+  loadAll();
+}
 async function loadAll(){
   const [stats,analytics,users,reports]=await Promise.all([
     getJSON('/api/admin/stats'),getJSON('/api/admin/analytics'),
