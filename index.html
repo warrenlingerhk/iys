@@ -83,6 +83,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .module-links a:hover{background:rgba(255,255,255,.15)}
 .save-status{justify-self:end; color:var(--lightBlue); font-weight:800; font-size:1rem; text-align:right;}
 .save-warn{color:var(--pink)}
+.score-pill{background:#fff;color:var(--navy);border:2px solid var(--pink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 .module-header{padding:40px 30px; text-align:center}
 .module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
@@ -306,7 +307,10 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 
 <div id="view-course" class="hidden">
   <nav class="module-menu">
-    <a href="#" class="back-home" onclick="showHome();return false;">&larr; Back</a>
+    <div style="justify-self:start;display:flex;align-items:center;gap:8px;">
+      <a href="#" class="back-home" style="padding-left:0;" onclick="showHome();return false;">&larr; Back</a>
+      <span id="score-pill" class="score-pill hidden"></span>
+    </div>
     <div class="module-links" id="module-links"></div>
     <span id="save-status" class="save-status">All changes saved.</span>
   </nav>
@@ -368,12 +372,32 @@ const LESSON_CSV_URLS = {
   'L27': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT5iBQhYuXYN18eLhU22rpNUm8JjF8N7U8lF9DjxlzT6q2Lk02tT1CWmV6Bxe60u_jHyau0iAPDTaKD/pub?output=csv',
 };
 
-let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '';
+let saveTimeout, LESSONS = [], COURSE_DATA = [], currentLessonId = '', ME = null;
 
 function hideAllViews() { ['view-home','view-auth-signup','view-auth-login','view-course','view-welcome'].forEach(v => document.getElementById(v).classList.add('hidden')); }
 function showHome(){ hideAllViews(); document.getElementById('view-home').classList.remove('hidden'); renderHeader(); renderLessons(); renderCommunity(); refreshGate(); history.pushState(null, '', '/'); window.scrollTo(0,0); }
 function showAuth(type) { hideAllViews(); document.getElementById(type === 'signup' ? 'view-auth-signup' : 'view-auth-login').classList.remove('hidden'); }
-function logout(){ localStorage.clear(); showHome(); }
+function logout(){ localStorage.clear(); ME = null; showHome(); }
+
+/* ---------- SCORE PILL (active members only, lesson banner) ---------- */
+function updateScorePill(){
+  const el = document.getElementById('score-pill');
+  if (!el) return;
+  if (ME && ME.is_active === 1) {
+    el.textContent = (ME.score || 0) + '/' + (ME.top_score || 0);
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+async function refreshMe(){
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + token} });
+    if (r.ok) { ME = await r.json(); updateScorePill(); }
+  } catch (e) {}
+}
 
 /* ---------- ACCESS GATE (Pending / Banned notice under the hero) ---------- */
 function clearGate(){
@@ -403,8 +427,10 @@ async function refreshGate(){
     const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + token} });
     if (!r.ok) { clearGate(); return; }
     const m = await r.json();
+    ME = m;
     localStorage.setItem('iys_status', m.status || 'Approved');
     if (m.user_number) { localStorage.setItem('iys_number', m.user_number); renderHeader(); }
+    updateScorePill();
     if (m.status === 'Pending' || m.status === 'Banned') applyGate(m.status);
     else if (m.welcomed === 0) showWelcome();
     else clearGate();
@@ -498,11 +524,11 @@ async function renderLessons(){
 async function handleLessonClick(id, active){
   if (!localStorage.getItem('token')) { showAuth('login'); return; }
   const isAdmin = localStorage.getItem('iys_is_admin') === '1';
-  if (isAdmin) { await loadLessonData(id); showCourse(); return; }
+  if (isAdmin) { await loadLessonData(id); showCourse(); refreshMe(); return; }
   let status = localStorage.getItem('iys_status') || 'Approved';
   try {
     const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
-    if (r.ok) { status = (await r.json()).status || 'Approved'; localStorage.setItem('iys_status', status); }
+    if (r.ok) { const m = await r.json(); ME = m; status = m.status || 'Approved'; localStorage.setItem('iys_status', status); updateScorePill(); }
   } catch (e) {}
   if (status !== 'Approved') {
     applyGate(status);
@@ -513,7 +539,7 @@ async function handleLessonClick(id, active){
   await loadLessonData(id); showCourse();
 }
 
-function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); }
+function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); updateScorePill(); }
 
 async function loadLessonData(id) {
     currentLessonId = id;
@@ -904,7 +930,7 @@ async function saveProgress(){
       headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
       body: JSON.stringify({ lesson: currentLessonId, progress: progress })
     });
-    if (res.ok) setStatus('All changes saved.', ''); else setStatus('Error saving!', 'save-warn');
+    if (res.ok) { setStatus('All changes saved.', ''); refreshMe(); } else setStatus('Error saving!', 'save-warn');
   } catch (e) { setStatus('Error saving!', 'save-warn'); }
 }
 
