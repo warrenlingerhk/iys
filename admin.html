@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -123,6 +121,7 @@ async function loadAll(){
       <span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span>
       <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <button class="${u.is_active?'btn-navy':'btn-ghost'} btn-mini" onclick="act('/api/admin/set-active',{user_id:${u.id},is_active:${u.is_active?0:1}})">Active</button>
         <button class="btn-navy btn-mini" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Approve</button>
         <button class="btn-ghost btn-mini" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Pending</button>
         <button class="btn-red btn-mini" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Banned</button>
