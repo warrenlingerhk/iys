@@ -25,6 +25,7 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Approved'",
       "ALTER TABLE users ADD COLUMN last_seen DATETIME",
       "ALTER TABLE users ADD COLUMN welcomed INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 0",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
       "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)"
@@ -110,8 +111,14 @@ async function handleApi(request, env, ctx, url) {
   if (path === '/api/me' && method === 'GET') {
     const userId = await auth(request, env);
     if (!userId) return json({ error: 'Please log in.' }, 401);
-    const user = await env.DB.prepare('SELECT name, is_admin, user_number, status, welcomed FROM users WHERE id = ?').bind(userId).first();
-    return json(user);
+    const user = await env.DB.prepare('SELECT name, is_admin, user_number, status, welcomed, is_active FROM users WHERE id = ?').bind(userId).first();
+    if (!user) return json({ error: 'Please log in.' }, 401);
+    const out = { name: user.name, is_admin: user.is_admin, user_number: user.user_number, status: user.status, welcomed: user.welcomed, is_active: user.is_active || 0 };
+    if (out.is_active) {
+      out.score = await scoreOf(env, userId);
+      out.top_score = await topActiveScore(env);
+    }
+    return json(out);
   }
   if (path === '/api/welcome-seen' && method === 'POST') {
     const userId = await auth(request, env);
@@ -232,7 +239,7 @@ async function handleApi(request, env, ctx, url) {
   }
   if (path === '/api/admin/users' && method === 'GET') {
     if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
-    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.status, u.created_at, u.last_seen,
+    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.is_active, u.status, u.created_at, u.last_seen,
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
@@ -250,16 +257,39 @@ async function handleApi(request, env, ctx, url) {
     if (row) ctx.waitUntil(syncMember(env, row));
     return json({ success: true });
   }
+  if (path === '/api/admin/set-active' && method === 'POST') {
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const { user_id, is_active } = await request.json();
+    await env.DB.prepare('UPDATE users SET is_active = ? WHERE id = ?').bind(is_active ? 1 : 0, user_id).run();
+    const row = await memberRow(env, user_id);
+    if (row) ctx.waitUntil(syncMember(env, row));
+    return json({ success: true });
+  }
   if (path === '/api/admin/sync-members' && method === 'POST') {
     const adminId = await requireAdmin(request, env);
     if (!adminId) return json({ error: 'Forbidden' }, 403);
-    const all = await env.DB.prepare(`SELECT u.id, u.email, u.name, u.created_at, u.status, u.user_number,
+    const all = await env.DB.prepare(`SELECT u.id, u.email, u.name, u.created_at, u.status, u.user_number, u.is_active,
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
-      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+      ${SCORE_SQL} as score
       FROM users u`).all();
-    for (const u of all.results) { await syncMember(env, u); }
-    return json({ success: true, count: all.results.length });
+    const members = all.results.map(u => ({
+      email: u.email, name: u.name, joined: (u.created_at || '').slice(0, 10), status: u.status,
+      user_number: u.user_number, posts: u.post_count || 0, modules: u.modules_done || 0, lessons: u.lessons_done || 0,
+      active: u.is_active ? 'Y' : 'N', score: u.is_active ? (u.score || 0) : ''
+    }));
+    if (env.AMS_WEBHOOK_URL) {
+      try {
+        await fetch(env.AMS_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type: 'members', members: members })
+        });
+      } catch (e) {}
+    }
+    return json({ success: true, count: members.length });
   }
   if (path === '/api/admin/set-admin' && method === 'POST') {
     const adminId = await requireAdmin(request, env);
@@ -298,11 +328,21 @@ async function handleApi(request, env, ctx, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
+const SCORE_SQL = `(SELECT COUNT(*) FROM progress p WHERE p.user_id = u.id AND ((p.type IN ('module_completion','lesson_completion') AND p.completed = 1) OR (p.type IN ('answer','poll') AND TRIM(p.note) <> '')))`;
+async function scoreOf(env, userId) {
+  const r = await env.DB.prepare(`SELECT ${SCORE_SQL} AS s FROM users u WHERE u.id = ?`).bind(userId).first();
+  return r?.s || 0;
+}
+async function topActiveScore(env) {
+  const r = await env.DB.prepare(`SELECT ${SCORE_SQL} AS s FROM users u WHERE u.is_active = 1 ORDER BY s DESC LIMIT 1`).first();
+  return r?.s || 0;
+}
 async function memberRow(env, userId) {
-  return await env.DB.prepare(`SELECT u.email, u.name, u.created_at, u.status, u.user_number,
+  return await env.DB.prepare(`SELECT u.email, u.name, u.created_at, u.status, u.user_number, u.is_active,
     (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
     (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
-    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+    ${SCORE_SQL} as score
     FROM users u WHERE u.id = ?`).bind(userId).first();
 }
 async function gateUser(request, env) {
@@ -360,7 +400,9 @@ async function syncMember(env, u) {
         user_number: u.user_number,
         posts: u.post_count || 0,
         modules: u.modules_done || 0,
-        lessons: u.lessons_done || 0
+        lessons: u.lessons_done || 0,
+        active: u.is_active ? 'Y' : 'N',
+        score: u.is_active ? (u.score || 0) : ''
       })
     });
   } catch (e) {}
