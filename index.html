@@ -541,8 +541,20 @@ async function handleLessonClick(id, active){
   await loadLessonData(id); showCourse();
 }
 
-function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); updateScorePill(); }
-
+function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); updateScorePill(); updateLocPill(); }
+function updateLocPill(){
+  const anchor = document.getElementById('score-pill');
+  if (!anchor) return;
+  let el = document.getElementById('loc-pill');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = 'loc-pill';
+    el.style.cssText = 'background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;';
+    anchor.insertAdjacentElement('afterend', el);
+  }
+  el.textContent = currentLessonId || '';
+}
+  
 async function loadLessonData(id) {
     currentLessonId = id;
     const lessonInfo = LESSONS.find(l => l.id === id);
