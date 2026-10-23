@@ -100,7 +100,7 @@ async function syncMembers(){
   const btn=document.getElementById('sync-members-btn');
   if(btn){ btn.disabled=true; btn.textContent='Syncing…'; }
   try{
-    const r=await api('/api/admin/sync-members',{});
+    const r=await api('/api/admin/sync-members',{method:'POST'});
     const j=await r.json().catch(function(){return {};});
     if(!r.ok){ alert(j.error||'Sync failed.'); }
     else { alert('Sheet updated: '+(j.count!=null?j.count+' member rows synced.':'done')); }
