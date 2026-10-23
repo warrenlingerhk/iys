@@ -381,14 +381,16 @@ function logout(){ localStorage.clear(); ME = null; showHome(); }
 
 /* ---------- SCORE PILL (active members only, lesson banner) ---------- */
 function updateScorePill(){
-  const el = document.getElementById('score-pill');
-  if (!el) return;
-  if (ME && ME.is_active === 1) {
-    el.textContent = (ME.score || 0) + '/' + (ME.top_score || 0);
-    el.classList.remove('hidden');
-  } else {
-    el.classList.add('hidden');
-  }
+ const el = document.getElementById('score-pill');
+ if (!el) return;
+ const ref = (ME && ME.ref_score) || 0;
+ if (ME && ME.is_active === 1 && ref > 0) {
+   const shown = Math.min(ME.score || 0, ref);
+   el.textContent = shown + '/' + ref;
+   el.classList.remove('hidden');
+ } else {
+   el.classList.add('hidden');
+ }
 }
 async function refreshMe(){
   const token = localStorage.getItem('token');
