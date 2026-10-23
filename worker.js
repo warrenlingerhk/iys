@@ -28,7 +28,8 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 0",
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
       "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
-      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)"
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_progress_user_item ON progress(user_id, item_id)"
     ];
     for (const s of statements) {
       try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
