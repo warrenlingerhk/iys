@@ -117,7 +117,7 @@ async function handleApi(request, env, ctx, url) {
     const out = { name: user.name, is_admin: user.is_admin, user_number: user.user_number, status: user.status, welcomed: user.welcomed, is_active: user.is_active || 0 };
     if (out.is_active) {
       out.score = await scoreOf(env, userId);
-      out.top_score = await topActiveScore(env);
+      out.ref_score = await refScore(env);
     }
     return json(out);
   }
@@ -334,9 +334,10 @@ async function scoreOf(env, userId) {
   const r = await env.DB.prepare(`SELECT ${SCORE_SQL} AS s FROM users u WHERE u.id = ?`).bind(userId).first();
   return r?.s || 0;
 }
-async function topActiveScore(env) {
-  const r = await env.DB.prepare(`SELECT ${SCORE_SQL} AS s FROM users u WHERE u.is_active = 1 ORDER BY s DESC LIMIT 1`).first();
-  return r?.s || 0;
+async function refScore(env) {
+  const ref = await env.DB.prepare('SELECT id FROM users WHERE is_admin = 1 ORDER BY user_number ASC LIMIT 1').first();
+  if (!ref) return 0;
+  return await scoreOf(env, ref.id);
 }
 async function memberRow(env, userId) {
   return await env.DB.prepare(`SELECT u.email, u.name, u.created_at, u.status, u.user_number, u.is_active,
