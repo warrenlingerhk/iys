@@ -157,6 +157,25 @@ async function handleApi(request, env, ctx, url) {
     }
   }
 
+   if (path === '/api/poll-results' && method === 'GET') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const itemId = url.searchParams.get('item_id') || '';
+    if (!itemId) return json({ error: 'Missing item.' }, 400);
+    const mine = await env.DB.prepare("SELECT note FROM progress WHERE user_id = ? AND item_id = ? AND type = 'poll'").bind(g.id, itemId).first();
+    if (!mine || !String(mine.note || '').trim()) return json({ locked: true, counts: {} });
+    const rows = await env.DB.prepare("SELECT note FROM progress WHERE item_id = ? AND type = 'poll' AND TRIM(note) <> '' AND user_id <> ?").bind(itemId, g.id).all();
+    const counts = {};
+    for (const r of rows.results) {
+      for (const part of String(r.note || '').split('|')) {
+        const key = part.trim();
+        if (key) counts[key] = (counts[key] || 0) + 1;
+      }
+    }
+    return json({ locked: false, counts });
+  }
+
   // --- COMMUNITY ---
   if (path === '/api/posts' && method === 'GET') {
     const g = await gateUser(request, env);
