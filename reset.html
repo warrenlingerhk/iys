@@ -1,0 +1,78 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IYS — Password Reset</title>
+<link rel="icon" type="image/png" href="/images/IYS%20Logo.png">
+<style>
+  body{background:#F8F9FA;color:#023E8A;font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;}
+  .card{background:#fff;border-radius:16px;box-shadow:0 8px 24px rgba(2,62,138,.12);width:min(440px,94%);overflow:hidden;}
+  .band{background:linear-gradient(90deg,#00B4D8,#E600FF);color:#fff;font-weight:800;padding:16px 24px;font-size:1.15rem;}
+  .body{padding:24px;}
+  input{width:100%;box-sizing:border-box;padding:11px 14px;border-radius:10px;border:2px solid #6C757D;font:inherit;margin:6px 0 14px;}
+  button{width:100%;border:none;border-radius:999px;background:#E600FF;color:#fff;font-weight:800;padding:11px;font-size:1rem;cursor:pointer;}
+  .msg{font-weight:700;color:#6C757D;margin:10px 0 0;}
+  .err{font-weight:800;color:#E600FF;margin:10px 0 0;}
+  a{color:#E600FF;font-weight:800;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="band">Influence Your Success — Password Reset</div>
+  <div class="body">
+    <div id="mode-request">
+      <p class="msg">Enter the email you registered with and we will send you a reset link.</p>
+      <input id="req-email" type="email" placeholder="Your email">
+      <button onclick="requestReset()">Send reset link</button>
+      <p class="msg" id="req-msg"></p>
+    </div>
+    <div id="mode-set" class="hidden">
+      <p class="msg">Choose a new password (8+ characters).</p>
+      <input id="new-pass" type="password" placeholder="New password">
+      <input id="new-pass-2" type="password" placeholder="Confirm new password">
+      <button onclick="submitReset()">Set new password</button>
+      <p class="err" id="set-err"></p>
+    </div>
+    <div id="mode-done" class="hidden">
+      <p class="msg">Your password has been changed. <a href="/">Return to log in</a>.</p>
+    </div>
+    <div id="mode-invalid" class="hidden">
+      <p class="msg">This reset link is invalid or has expired. <a href="/reset.html">Request a new one</a>.</p>
+    </div>
+    <p class="msg"><a href="/">Back to log in</a></p>
+  </div>
+</div>
+<script>
+const token = new URLSearchParams(location.search).get('token');
+async function requestReset(){
+  const email = document.getElementById('req-email').value.trim();
+  if (!email) { document.getElementById('req-msg').innerText = 'Please enter your email.'; return; }
+  await fetch('/api/forgot-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }) });
+  document.getElementById('req-msg').innerText = 'If that email is registered, a reset link is on its way. It expires in one hour.';
+}
+async function submitReset(){
+  const p1 = document.getElementById('new-pass').value;
+  const p2 = document.getElementById('new-pass-2').value;
+  const err = document.getElementById('set-err'); err.innerText = '';
+  if (p1 !== p2) { err.innerText = 'Passwords do not match.'; return; }
+  const r = await fetch('/api/reset-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token: token, newPassword: p1 }) });
+  const j = await r.json().catch(function(){ return {}; });
+  if (!r.ok) { err.innerText = j.error || 'Reset failed.'; return; }
+  document.getElementById('mode-set').classList.add('hidden');
+  document.getElementById('mode-done').classList.remove('hidden');
+}
+(async function boot(){
+  if (!token) return;
+  document.getElementById('mode-request').classList.add('hidden');
+  const r = await fetch('/api/reset-check?token=' + encodeURIComponent(token));
+  const j = await r.json().catch(function(){ return {}; });
+  if (j.valid) document.getElementById('mode-set').classList.remove('hidden');
+  else document.getElementById('mode-invalid').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>
