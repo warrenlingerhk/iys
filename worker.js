@@ -165,7 +165,7 @@ async function handleApi(request, env, ctx, url) {
     if (!itemId) return json({ error: 'Missing item.' }, 400);
     const mine = await env.DB.prepare("SELECT note FROM progress WHERE user_id = ? AND item_id = ? AND type = 'poll'").bind(g.id, itemId).first();
     if (!mine || !String(mine.note || '').trim()) return json({ locked: true, counts: {} });
-    const rows = await env.DB.prepare("SELECT note FROM progress WHERE item_id = ? AND type = 'poll' AND TRIM(note) <> '' AND user_id <> ?").bind(itemId, g.id).all();
+    const rows = await env.DB.prepare("SELECT note FROM progress WHERE item_id = ? AND type = 'poll' AND TRIM(note) <> ''").bind(itemId).all();
     const counts = {};
     for (const r of rows.results) {
       for (const part of String(r.note || '').split('|')) {
