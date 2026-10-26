@@ -84,6 +84,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .save-status{justify-self:end; color:var(--lightBlue); font-weight:800; font-size:1rem; text-align:right;}
 .save-warn{color:var(--pink)}
 .score-pill{background:#fff;color:var(--navy);border:2px solid var(--pink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
+.loc-pill{background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 .module-header{padding:40px 30px; text-align:center}
 .module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
@@ -381,16 +382,16 @@ function logout(){ localStorage.clear(); ME = null; showHome(); }
 
 /* ---------- SCORE PILL (active members only, lesson banner) ---------- */
 function updateScorePill(){
- const el = document.getElementById('score-pill');
- if (!el) return;
- const ref = (ME && ME.ref_score) || 0;
- if (ME && ME.is_active === 1 && ref > 0) {
-   const shown = Math.min(ME.score || 0, ref);
-   el.textContent = shown + '/' + ref;
-   el.classList.remove('hidden');
- } else {
-   el.classList.add('hidden');
- }
+  const el = document.getElementById('score-pill');
+  if (!el) return;
+  const ref = (ME && ME.ref_score) || 0;
+  if (ME && ME.is_active === 1 && ref > 0) {
+    const shown = Math.min(ME.score || 0, ref);
+    el.textContent = shown + '/' + ref;
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
 }
 async function refreshMe(){
   const token = localStorage.getItem('token');
@@ -399,6 +400,50 @@ async function refreshMe(){
     const r = await fetch('/api/me', { headers:{'Authorization':'Bearer ' + token} });
     if (r.ok) { ME = await r.json(); updateScorePill(); }
   } catch (e) {}
+}
+
+/* ---------- LOCATION PILL (lesson number in banner) ---------- */
+function updateLocPill(){
+  const anchor = document.getElementById('score-pill');
+  if (!anchor) return;
+  let el = document.getElementById('loc-pill');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = 'loc-pill';
+    el.style.cssText = 'background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;';
+    anchor.insertAdjacentElement('afterend', el);
+  }
+  el.textContent = currentLessonId || '';
+}
+
+/* ---------- POLL RESULTS CHART (visible only after own vote) ---------- */
+async function updatePollCharts(){
+  const charts = document.querySelectorAll('.poll-chart');
+  for (const ch of charts) {
+    const box = ch.parentElement ? ch.parentElement.querySelector('.poll-box') : null;
+    if (!box) { ch.innerHTML = ''; continue; }
+    const labels = Array.from(box.querySelectorAll('.poll-option'));
+    const voted = labels.some(l => { const i = l.querySelector('input'); return i && i.checked; });
+    if (!voted) { ch.innerHTML = ''; continue; }
+    const id = ch.dataset.poll;
+    try {
+      const r = await fetch('/api/poll-results?item_id=' + encodeURIComponent(id), { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
+      if (!r.ok) { ch.innerHTML = ''; continue; }
+      const data = await r.json();
+      if (data.locked) { ch.innerHTML = ''; continue; }
+      const counts = data.counts || {};
+      const opts = labels.map(l => (l.textContent || '').trim());
+      const max = Math.max(1, ...opts.map(o => counts[o] || 0));
+      ch.innerHTML = '<p style="font-size:.8rem;font-weight:800;color:var(--slate);margin:10px 0 4px;">How other members answered</p>' + opts.map(o => {
+        const c = counts[o] || 0;
+        const w = Math.round((c / max) * 100);
+        return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">' +
+          '<span style="flex:0 0 90px;font-weight:700;font-size:.85rem;color:var(--navy);">' + escapeHtml(o) + '</span>' +
+          '<div style="flex:1;background:#e6f4fb;border-radius:999px;height:14px;overflow:hidden;"><div style="height:100%;width:' + w + '%;background:linear-gradient(90deg,var(--blue),var(--pink));border-radius:999px;"></div></div>' +
+          '<span style="flex:0 0 24px;text-align:right;font-weight:800;font-size:.85rem;color:var(--slate);">' + c + '</span></div>';
+      }).join('');
+    } catch (e) { ch.innerHTML = ''; }
+  }
 }
 
 /* ---------- ACCESS GATE (Pending / Banned notice under the hero) ---------- */
@@ -542,19 +587,7 @@ async function handleLessonClick(id, active){
 }
 
 function showCourse(){ hideAllViews(); document.getElementById('view-course').classList.remove('hidden'); history.pushState(null, '', '#course'); window.scrollTo(0,0); updateScorePill(); updateLocPill(); }
-function updateLocPill(){
-  const anchor = document.getElementById('score-pill');
-  if (!anchor) return;
-  let el = document.getElementById('loc-pill');
-  if (!el) {
-    el = document.createElement('span');
-    el.id = 'loc-pill';
-    el.style.cssText = 'background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;';
-    anchor.insertAdjacentElement('afterend', el);
-  }
-  el.textContent = currentLessonId || '';
-}
-  
+
 async function loadLessonData(id) {
     currentLessonId = id;
     const lessonInfo = LESSONS.find(l => l.id === id);
@@ -829,11 +862,11 @@ function renderCourse(){
                 div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content">${innerHtml}${imgHtml}${nested}</div></div>`;
             } else if (type === 'answer') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><div class="answer-box"><label>${content}</label><textarea class="answer-input" placeholder="${extra1}" oninput="triggerAutoSave()"></textarea></div>`;
-           } else if (type === 'poll') {
+            } else if (type === 'poll') {
                 const options = extra1 ? extra1.split('|') : [];
                 const isMulti = extra2 === 'multi';
                 const inputType = isMulti ? 'checkbox' : 'radio';
-                div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="poll-box">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt.trim()}" onchange="triggerAutoSave()"> ${opt.trim()}</label>`).join('')}</div></div></div>`;
+                div.innerHTML = `<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle('expanded')"><span>${title}</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg></div><div class="expandable-content"><div class="poll-box">${options.map(opt => `<label class="poll-option"><input type="${inputType}" name="poll-${id}" value="${opt.trim()}" onchange="triggerAutoSave()"> ${opt.trim()}</label>`).join('')}</div><div class="poll-chart" data-poll="${id}"></div></div></div>`;
             } else if (type === 'link') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
             } else if (type === 'image') {
@@ -945,7 +978,7 @@ async function saveProgress(){
       headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
       body: JSON.stringify({ lesson: currentLessonId, progress: progress })
     });
-    if (res.ok) { setStatus('All changes saved.', ''); refreshMe(); } else setStatus('Error saving!', 'save-warn');
+    if (res.ok) { setStatus('All changes saved.', ''); refreshMe(); updatePollCharts(); } else setStatus('Error saving!', 'save-warn');
   } catch (e) { setStatus('Error saving!', 'save-warn'); }
 }
 
@@ -987,6 +1020,7 @@ async function loadProgress(){
     if (lessonCheck && lessonSaved) lessonCheck.checked = lessonSaved.completed === 1;
     setStatus('All changes saved.', '');
     updateLessonCheck();
+    updatePollCharts();
   } catch (e) {
     console.error('Error loading progress:', e);
     updateLessonCheck();
