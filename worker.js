@@ -29,7 +29,8 @@ async function handleApi(request, env, ctx, url) {
       "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
       "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)",
-      "CREATE UNIQUE INDEX IF NOT EXISTS idx_progress_user_item ON progress(user_id, item_id)"
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_progress_user_item ON progress(user_id, item_id)",
+      "CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, token TEXT, expires_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
     ];
     for (const s of statements) {
       try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
@@ -89,6 +90,46 @@ async function handleApi(request, env, ctx, url) {
       await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
       return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin, status: user.status });
     } catch (e) { return json({ error: 'Our system hit a technical error during sign-in. Screenshot this message and send it to DrWarren or his team.' }, 500); }
+  }
+  if (path === '/api/forgot-password' && method === 'POST') {
+    const { email } = await request.json();
+    const clean = String(email || '').trim().toLowerCase();
+    const user = clean ? await env.DB.prepare('SELECT id, name FROM users WHERE email = ?').bind(clean).first() : null;
+    if (user) {
+      const token = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, datetime('now', '+1 hour'))").bind(user.id, token).run();
+      if (env.AMS_WEBHOOK_URL) {
+        ctx.waitUntil(fetch(env.AMS_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type: 'reset-email', to: clean, name: user.name || '', url: 'https://influenceyoursuccess.com/reset.html?token=' + token })
+        }).catch(function(){}));
+      }
+    }
+    return json({ success: true });
+  }
+  if (path === '/api/reset-check' && method === 'GET') {
+    const token = url.searchParams.get('token') || '';
+    const row = token ? await env.DB.prepare("SELECT id FROM password_resets WHERE token = ? AND expires_at > datetime('now')").bind(token).first() : null;
+    return json({ valid: !!row });
+  }
+  if (path === '/api/reset-password' && method === 'POST') {
+    const { token, newPassword } = await request.json();
+    if (!newPassword || String(newPassword).length < 8) return json({ error: 'Password must be 8+ characters.' }, 400);
+    const row = token ? await env.DB.prepare("SELECT user_id FROM password_resets WHERE token = ? AND expires_at > datetime('now')").bind(token).first() : null;
+    if (!row) return json({ error: 'This reset link is invalid or has expired. Please request a new one.' }, 400);
+    const hash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hash, row.user_id).run();
+    await env.DB.prepare('DELETE FROM password_resets WHERE token = ?').bind(token).run();
+    const u = await env.DB.prepare('SELECT name, email FROM users WHERE id = ?').bind(row.user_id).first();
+    if (env.AMS_WEBHOOK_URL && u) {
+      ctx.waitUntil(fetch(env.AMS_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ type: 'admin-notice', name: u.name || '', email: u.email || '' })
+      }).catch(function(){}));
+    }
+    return json({ success: true });
   }
   if (path === '/api/change-password' && method === 'POST') {
     const userId = await auth(request, env);
@@ -157,33 +198,14 @@ async function handleApi(request, env, ctx, url) {
     }
   }
 
-   if (path === '/api/poll-results' && method === 'GET') {
-    const g = await gateUser(request, env);
-    if (!g.id) return json({ error: 'Please log in.' }, 401);
-    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
-    const itemId = url.searchParams.get('item_id') || '';
-    if (!itemId) return json({ error: 'Missing item.' }, 400);
-    const mine = await env.DB.prepare("SELECT note FROM progress WHERE user_id = ? AND item_id = ? AND type = 'poll'").bind(g.id, itemId).first();
-    if (!mine || !String(mine.note || '').trim()) return json({ locked: true, counts: {} });
-    const rows = await env.DB.prepare("SELECT note FROM progress WHERE item_id = ? AND type = 'poll' AND TRIM(note) <> ''").bind(itemId).all();
-    const counts = {};
-    for (const r of rows.results) {
-      for (const part of String(r.note || '').split('|')) {
-        const key = part.trim();
-        if (key) counts[key] = (counts[key] || 0) + 1;
-      }
-    }
-    return json({ locked: false, counts });
-  }
-
   // --- COMMUNITY ---
   if (path === '/api/posts' && method === 'GET') {
     const g = await gateUser(request, env);
     if (!g.id) return json({ error: 'Please log in.' }, 401);
     if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
-    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.status <> 'Banned' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(g.id).all();
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, p.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.status <> 'Banned' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(g.id).all();
     for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.status <> 'Banned' ORDER BY p.created_at ASC`).bind(g.id, post.id).all();
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, p.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.status <> 'Banned' ORDER BY p.created_at ASC`).bind(g.id, post.id).all();
     }
     return json(posts.results);
   }
