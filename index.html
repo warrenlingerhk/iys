@@ -434,7 +434,7 @@ async function updatePollCharts(){
       const counts = data.counts || {};
       const opts = labels.map(l => (l.textContent || '').trim());
       const max = Math.max(1, ...opts.map(o => counts[o] || 0));
-      ch.innerHTML = '<p style="font-size:.8rem;font-weight:800;color:var(--slate);margin:10px 0 4px;">How other members answered</p>' + opts.map(o => {
+      ch.innerHTML = '<p style="font-size:.8rem;font-weight:800;color:var(--slate);margin:10px 0 4px;">How members answered so far</p>' + opts.map(o => {
         const c = counts[o] || 0;
         const w = Math.round((c / max) * 100);
         return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">' +
