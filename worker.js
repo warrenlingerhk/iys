@@ -198,6 +198,7 @@ async function handleApi(request, env, ctx, url) {
     }
   }
 
+  // --- POLL RESULTS ---
   if (path === '/api/poll-results' && method === 'GET') {
     const g = await gateUser(request, env);
     if (!g.id) return json({ error: 'Please log in.' }, 401);
@@ -222,9 +223,9 @@ async function handleApi(request, env, ctx, url) {
     const g = await gateUser(request, env);
     if (!g.id) return json({ error: 'Please log in.' }, 401);
     if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
-    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, p.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.status <> 'Banned' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(g.id).all();
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.status <> 'Banned' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(g.id).all();
     for (let post of posts.results) {
-      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, p.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.status <> 'Banned' ORDER BY p.created_at ASC`).bind(g.id, post.id).all();
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.status <> 'Banned' ORDER BY p.created_at ASC`).bind(g.id, post.id).all();
     }
     return json(posts.results);
   }
@@ -334,11 +335,14 @@ async function handleApi(request, env, ctx, url) {
       (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
       (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'answer' AND TRIM(pr.note) <> '') as answers_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'poll' AND TRIM(pr.note) <> '') as polls_done,
       ${SCORE_SQL} as score
       FROM users u`).all();
     const members = all.results.map(u => ({
       email: u.email, name: u.name, joined: (u.created_at || '').slice(0, 10), status: u.status,
       user_number: u.user_number, posts: u.post_count || 0, modules: u.modules_done || 0, lessons: u.lessons_done || 0,
+      answers: u.answers_done || 0, polls: u.polls_done || 0,
       active: u.is_active ? 'Y' : 'N', score: u.is_active ? (u.score || 0) : ''
     }));
     if (env.AMS_WEBHOOK_URL) {
@@ -404,6 +408,8 @@ async function memberRow(env, userId) {
     (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
     (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
     (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'answer' AND TRIM(pr.note) <> '') as answers_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'poll' AND TRIM(pr.note) <> '') as polls_done,
     ${SCORE_SQL} as score
     FROM users u WHERE u.id = ?`).bind(userId).first();
 }
@@ -463,6 +469,8 @@ async function syncMember(env, u) {
         posts: u.post_count || 0,
         modules: u.modules_done || 0,
         lessons: u.lessons_done || 0,
+        answers: u.answers_done || 0,
+        polls: u.polls_done || 0,
         active: u.is_active ? 'Y' : 'N',
         score: u.is_active ? (u.score || 0) : ''
       })
