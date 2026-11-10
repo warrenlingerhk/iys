@@ -1,470 +1,479 @@
 
 
-// ============================================================================
-// STUDIO PLATFORM — MULTI-TENANT BACKEND WORKER (worker.js)
-// ============================================================================
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-      return handleCors();
-    }
-
     if (url.pathname.startsWith('/api/')) {
-      try {
-        return await handleApi(request, env, ctx, url);
-      } catch (e) {
-        return json({ error: e.message || 'Internal Server Error' }, 500);
-      }
+      try { return await handleApi(request, env, ctx, url); }
+      catch (e) { return json({ error: e.message }, 500); }
     }
-
-    if (env.ASSETS) {
-      return await env.ASSETS.fetch(request);
-    }
-    return fetch(request);
-  }
+    return env.ASSETS.fetch(request);
+  },
 };
 
 async function handleApi(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
-  // --- AUTH & PROFILE ---
-  if (path === '/api/login' && method === 'POST') {
-    return await handleLogin(request, env);
+  // --- MIGRATIONS & SYNC TEST ---
+  if (path === '/api/migrate' && method === 'GET') {
+    const results = [];
+    const statements = [
+      "ALTER TABLE users ADD COLUMN user_number INTEGER",
+      "ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Approved'",
+      "ALTER TABLE users ADD COLUMN last_seen DATETIME",
+      "ALTER TABLE users ADD COLUMN welcomed INTEGER DEFAULT 0",
+      "ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 0",
+      "ALTER TABLE progress ADD COLUMN type TEXT DEFAULT 'answer'",
+      "CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, reporter_id INTEGER, reason TEXT, resolved INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_progress_user_item ON progress(user_id, item_id)",
+      "CREATE TABLE IF NOT EXISTS password_resets (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, token TEXT, expires_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+    ];
+    for (const s of statements) {
+      try { await env.DB.prepare(s).run(); results.push('added: ' + s); }
+      catch (e) { results.push('already there: ' + s); }
+    }
+    return json({ results });
   }
+  if (path === '/api/sync-test' && method === 'GET') {
+    if (!env.AMS_WEBHOOK_URL) return json({ var: 'MISSING - add AMS_WEBHOOK_URL under [vars] in wrangler.toml' });
+    const gRes = await fetch(env.AMS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        email: 'synctest@iys.test', name: 'Sync Test', user_number: '000', lesson: 'L1',
+        progress: [{ item_id: 'sync-test', header_name: 'M1', format: 'module', completed: 1, note: '' }]
+      })
+    });
+    const t = await gRes.text();
+    return json({ var: 'set', status: gRes.status, google: t });
+  }
+
+  // --- AUTH ---
   if (path === '/api/signup' && method === 'POST') {
-    return await handleSignup(request, env, ctx);
+    const { name, email, password } = await request.json();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail || !password || String(password).length < 8)
+      return json({ error: 'Email and password (8+ chars) required.' }, 400);
+    const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(cleanEmail).first();
+    if (existing) return json({ error: 'That email is already registered. Please log in instead, or ask DrWarren or his team to reset your password.' }, 409);
+    const hash = await hashPassword(password);
+    const maxUser = await env.DB.prepare('SELECT MAX(user_number) as max_num FROM users').first();
+    const nextUserNumber = Math.max(102, (maxUser?.max_num || 0) + 1);
+    try {
+      await env.DB.prepare("INSERT INTO users (email, password, name, user_number, status, created_at) VALUES (?, ?, ?, ?, 'Pending', datetime('now'))").bind(cleanEmail, hash, String(name || '').trim(), nextUserNumber).run();
+    } catch (e) {
+      if (String(e.message || '').indexOf('UNIQUE') !== -1) {
+        return json({ error: 'That email is already registered. Please log in instead, or ask DrWarren or his team to reset your password.' }, 409);
+      }
+      return json({ error: 'Sign-up failed: ' + e.message }, 500);
+    }
+    const user = await env.DB.prepare('SELECT id, name, user_number FROM users WHERE email = ?').bind(cleanEmail).first();
+    const token = crypto.randomUUID();
+    await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
+    const mrow = await memberRow(env, user.id);
+    if (mrow) ctx.waitUntil(syncMember(env, mrow));
+    return json({ token, name: user.name, user_number: user.user_number, is_admin: 0, status: 'Pending' });
+  }
+  if (path === '/api/login' && method === 'POST') {
+    try {
+      const { email, password } = await request.json();
+      const clean = String(email || '').trim().toLowerCase();
+      const user = await env.DB.prepare('SELECT id, password, name, user_number, is_admin, status FROM users WHERE email = ?').bind(clean).first();
+      if (!user) return json({ error: 'No account found for this email. Please create an account first, or check the spelling. Quote this message to DrWarren or his team.' }, 404);
+      if (user.password !== await hashPassword(password || '')) return json({ error: 'Incorrect password for this account. If you cannot remember it, DrWarren or his team can reset it. Quote this message to DrWarren or his team.' }, 401);
+      if (user.status === 'Banned') return json({ error: 'This account has been Banned. Talk to DrWarren or his team.' }, 403);
+      const token = crypto.randomUUID();
+      await env.DB.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').bind(token, user.id).run();
+      return json({ token, name: user.name, user_number: user.user_number, is_admin: user.is_admin, status: user.status });
+    } catch (e) { return json({ error: 'Our system hit a technical error during sign-in. Screenshot this message and send it to DrWarren or his team.' }, 500); }
+  }
+  if (path === '/api/forgot-password' && method === 'POST') {
+    const { email } = await request.json();
+    const clean = String(email || '').trim().toLowerCase();
+    const user = clean ? await env.DB.prepare('SELECT id, name FROM users WHERE email = ?').bind(clean).first() : null;
+    if (user) {
+      const token = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, datetime('now', '+1 hour'))").bind(user.id, token).run();
+      if (env.AMS_WEBHOOK_URL) {
+        ctx.waitUntil(fetch(env.AMS_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type: 'reset-email', to: clean, name: user.name || '', url: 'https://influenceyoursuccess.com/reset.html?token=' + token })
+        }).catch(function(){}));
+      }
+    }
+    return json({ success: true });
+  }
+  if (path === '/api/reset-check' && method === 'GET') {
+    const token = url.searchParams.get('token') || '';
+    const row = token ? await env.DB.prepare("SELECT id FROM password_resets WHERE token = ? AND expires_at > datetime('now')").bind(token).first() : null;
+    return json({ valid: !!row });
+  }
+  if (path === '/api/reset-password' && method === 'POST') {
+    const { token, newPassword } = await request.json();
+    if (!newPassword || String(newPassword).length < 8) return json({ error: 'Password must be 8+ characters.' }, 400);
+    const row = token ? await env.DB.prepare("SELECT user_id FROM password_resets WHERE token = ? AND expires_at > datetime('now')").bind(token).first() : null;
+    if (!row) return json({ error: 'This reset link is invalid or has expired. Please request a new one.' }, 400);
+    const hash = await hashPassword(newPassword);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hash, row.user_id).run();
+    await env.DB.prepare('DELETE FROM password_resets WHERE token = ?').bind(token).run();
+    const u = await env.DB.prepare('SELECT name, email FROM users WHERE id = ?').bind(row.user_id).first();
+    if (env.AMS_WEBHOOK_URL && u) {
+      ctx.waitUntil(fetch(env.AMS_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ type: 'admin-notice', name: u.name || '', email: u.email || '' })
+      }).catch(function(){}));
+    }
+    return json({ success: true });
   }
   if (path === '/api/change-password' && method === 'POST') {
-    return await handleChangePassword(request, env, ctx);
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in again.' }, 401);
+    const { currentPassword, newPassword, newName } = await request.json();
+    const cleanName = String(newName || '').trim();
+    if (!cleanName && !newPassword) return json({ error: 'Enter a new name, a new password, or both.' }, 400);
+    const user = await env.DB.prepare('SELECT password FROM users WHERE id = ?').bind(userId).first();
+    if (!user || user.password !== await hashPassword(currentPassword || '')) return json({ error: 'Current password is incorrect.' }, 400);
+    if (newPassword) {
+      if (String(newPassword).length < 8) return json({ error: 'New password must be 8+ characters.' }, 400);
+      await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(await hashPassword(newPassword), userId).run();
+    }
+    if (cleanName) {
+      await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(cleanName, userId).run();
+      const row = await memberRow(env, userId);
+      if (row) { row.name = cleanName; ctx.waitUntil(syncMember(env, row)); }
+    }
+    return json({ success: true });
+  }
+  if (path === '/api/me' && method === 'GET') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    const user = await env.DB.prepare('SELECT name, is_admin, user_number, status, welcomed, is_active FROM users WHERE id = ?').bind(userId).first();
+    if (!user) return json({ error: 'Please log in.' }, 401);
+    const out = { name: user.name, is_admin: user.is_admin, user_number: user.user_number, status: user.status, welcomed: user.welcomed, is_active: user.is_active || 0 };
+    if (out.is_active) {
+      out.score = await scoreOf(env, userId);
+      out.ref_score = await refScore(env);
+    }
+    return json(out);
+  }
+  if (path === '/api/welcome-seen' && method === 'POST') {
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    await env.DB.prepare('UPDATE users SET welcomed = 1 WHERE id = ?').bind(userId).run();
+    return json({ success: true });
   }
   if (path === '/api/heartbeat' && method === 'GET') {
-    return await handleHeartbeat(request, env);
+    const userId = await auth(request, env);
+    if (!userId) return json({ error: 'Please log in.' }, 401);
+    try { await env.DB.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(userId).run(); } catch (e) {}
+    return json({ ok: true });
   }
 
-  // --- COMMUNITY POSTS ---
-  if (path === '/api/posts') {
-    if (method === 'GET') return await handleGetPosts(request, env);
-    if (method === 'POST') return await handleCreatePost(request, env);
+  // --- PROGRESS ---
+  if (path === '/api/progress') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in again.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    if (method === 'GET') {
+      const res = await env.DB.prepare('SELECT item_id, completed, note, type FROM progress WHERE user_id = ?').bind(g.id).all();
+      return json(res.results);
+    }
+    if (method === 'POST') {
+      const { progress, lesson } = await request.json();
+      for (const item of (progress || [])) {
+        await env.DB.prepare("INSERT OR REPLACE INTO progress (user_id, item_id, completed, note, type, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))")
+          .bind(g.id, item.item_id, item.completed ? 1 : 0, item.note || '', item.type || 'answer').run();
+      }
+      if (env.AMS_WEBHOOK_URL) {
+        const user = await env.DB.prepare('SELECT email, name, user_number FROM users WHERE id = ?').bind(g.id).first();
+        ctx.waitUntil(syncSheet(env.AMS_WEBHOOK_URL, user.email, user.name, user.user_number, lesson, progress || []));
+      }
+      return json({ success: true });
+    }
+  }
+
+  // --- POLL RESULTS ---
+  if (path === '/api/poll-results' && method === 'GET') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const itemId = url.searchParams.get('item_id') || '';
+    if (!itemId) return json({ error: 'Missing item.' }, 400);
+    const mine = await env.DB.prepare("SELECT note FROM progress WHERE user_id = ? AND item_id = ? AND type = 'poll'").bind(g.id, itemId).first();
+    if (!mine || !String(mine.note || '').trim()) return json({ locked: true, counts: {} });
+    const rows = await env.DB.prepare("SELECT note FROM progress WHERE item_id = ? AND type = 'poll' AND TRIM(note) <> ''").bind(itemId).all();
+    const counts = {};
+    for (const r of rows.results) {
+      for (const part of String(r.note || '').split('|')) {
+        const key = part.trim();
+        if (key) counts[key] = (counts[key] || 0) + 1;
+      }
+    }
+    return json({ locked: false, counts });
+  }
+
+  // --- COMMUNITY ---
+  if (path === '/api/posts' && method === 'GET') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const posts = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id IS NULL AND u.status <> 'Banned' ORDER BY p.pinned DESC, p.created_at DESC LIMIT 50`).bind(g.id).all();
+    for (let post of posts.results) {
+      post.replies = await env.DB.prepare(`SELECT p.*, u.name as user_name, u.id as user_id, (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as like_count, (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as user_liked FROM posts p JOIN users u ON p.user_id = u.id WHERE p.parent_id = ? AND u.status <> 'Banned' ORDER BY p.created_at ASC`).bind(g.id, post.id).all();
+    }
+    return json(posts.results);
+  }
+  if (path === '/api/posts' && method === 'POST') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const { content, parent_id } = await request.json();
+    if (!content) return json({ error: 'Post cannot be empty.' }, 400);
+    const res = await env.DB.prepare('INSERT INTO posts (user_id, content, parent_id) VALUES (?, ?, ?)').bind(g.id, content, parent_id || null).run();
+    return json({ id: res.meta.last_row_id });
   }
   if (path === '/api/posts/delete' && method === 'POST') {
-    return await handleDeletePost(request, env);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Admin only.' }, 403);
+    const { post_id } = await request.json();
+    await env.DB.prepare('DELETE FROM posts WHERE id = ? OR parent_id = ?').bind(post_id, post_id).run();
+    return json({ success: true });
+  }
+  if (path === '/api/posts/pin' && method === 'POST') {
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Admin only.' }, 403);
+    const { post_id } = await request.json();
+    await env.DB.prepare('UPDATE posts SET pinned = NOT pinned WHERE id = ?').bind(post_id).run();
+    return json({ success: true });
+  }
+  if (path === '/api/reports' && method === 'POST') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const { post_id, reason } = await request.json();
+    await env.DB.prepare('INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)').bind(post_id, g.id, reason || '').run();
+    return json({ success: true });
+  }
+  if (path === '/api/likes' && method === 'POST') {
+    const g = await gateUser(request, env);
+    if (!g.id) return json({ error: 'Please log in.' }, 401);
+    if (g.status !== 'Approved') return json({ error: gateError(g.status) }, 403);
+    const { post_id } = await request.json();
+    try {
+      await env.DB.prepare('INSERT INTO likes (post_id, user_id) VALUES (?, ?)').bind(post_id, g.id).run();
+      return json({ liked: true });
+    } catch (e) {
+      await env.DB.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').bind(post_id, g.id).run();
+      return json({ liked: false });
+    }
   }
 
-  // --- SITE ADMINISTRATION ---
+  // --- ADMIN DASHBOARD ---
   if (path === '/api/admin/stats' && method === 'GET') {
-    return await handleAdminStats(request, env);
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const users = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
+    const posts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
+    const reports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first();
+    const active = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE last_seen >= datetime('now', '-5 minutes')").first();
+    return json({ users: users?.c || 0, posts: posts?.c || 0, reports: reports?.c || 0, active: active?.c || 0 });
   }
   if (path === '/api/admin/analytics' && method === 'GET') {
-    return await handleAdminAnalytics(request, env);
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const totalUsers = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
+    const activeLearners = await env.DB.prepare('SELECT COUNT(DISTINCT user_id) as c FROM progress').first();
+    const totalPosts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts WHERE parent_id IS NULL').first();
+    const totalReports = await env.DB.prepare('SELECT COUNT(*) as c FROM reports').first();
+    const totalCount = totalUsers?.c || 0;
+    const activeCount = activeLearners?.c || 0;
+    const postsCount = totalPosts?.c || 0;
+    const reportsCount = totalReports?.c || 0;
+    const lessonFinishers = await env.DB.prepare("SELECT COUNT(DISTINCT user_id) as c FROM progress WHERE type = 'lesson_completion' AND completed = 1").first();
+    const eliteRate = totalCount > 0 ? Math.round((lessonFinishers?.c || 0) / totalCount * 100) : 0;
+    const engagement = totalCount > 0 ? (postsCount / totalCount).toFixed(1) : 0;
+    const healthRatio = postsCount > 0 ? (reportsCount / postsCount).toFixed(2) : 0;
+    return json({ totalUsers: totalCount, activeLearners: activeCount, eliteRate, engagement, healthRatio });
   }
   if (path === '/api/admin/users' && method === 'GET') {
-    return await handleAdminUsers(request, env);
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const res = await env.DB.prepare(`SELECT u.id, u.name, u.email, u.user_number as member_number, u.is_admin, u.is_active, u.status, u.created_at, u.last_seen,
+      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done
+      FROM users u ORDER BY CASE WHEN u.status = 'Pending' THEN 0 ELSE 1 END ASC, u.user_number ASC`).all();
+    return json(res.results);
   }
   if (path === '/api/admin/status' && method === 'POST') {
-    return await handleAdminSetStatus(request, env);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const { user_id, status } = await request.json();
+    if (!['Pending', 'Approved', 'Banned'].includes(status)) return json({ error: 'Unknown status.' }, 400);
+    if (Number(user_id) === Number(adminId)) return json({ error: 'You cannot change your own status.' }, 400);
+    await env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(status, user_id).run();
+    const row = await memberRow(env, user_id);
+    if (row) ctx.waitUntil(syncMember(env, row));
+    return json({ success: true });
   }
-  if (path === '/api/admin/set-paid' && method === 'POST') {
-    return await handleAdminSetPaid(request, env);
-  }
-  if (path === '/api/admin/set-admin' && method === 'POST') {
-    return await handleAdminSetAdmin(request, env);
-  }
-  if (path === '/api/admin/reset-password' && method === 'POST') {
-    return await handleAdminResetPassword(request, env);
+  if (path === '/api/admin/set-active' && method === 'POST') {
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const { user_id, is_active } = await request.json();
+    await env.DB.prepare('UPDATE users SET is_active = ? WHERE id = ?').bind(is_active ? 1 : 0, user_id).run();
+    const row = await memberRow(env, user_id);
+    if (row) ctx.waitUntil(syncMember(env, row));
+    return json({ success: true });
   }
   if (path === '/api/admin/sync-members' && method === 'POST') {
-    return await handleAdminSyncMembers(request, env);
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const all = await env.DB.prepare(`SELECT u.id, u.email, u.name, u.created_at, u.status, u.user_number, u.is_active,
+      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'answer' AND TRIM(pr.note) <> '') as answers_done,
+      (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'poll' AND TRIM(pr.note) <> '') as polls_done,
+      ${SCORE_SQL} as score
+      FROM users u`).all();
+    const members = all.results.map(u => ({
+      email: u.email, name: u.name, joined: (u.created_at || '').slice(0, 10), status: u.status,
+      user_number: u.user_number, posts: u.post_count || 0, modules: u.modules_done || 0, lessons: u.lessons_done || 0,
+      answers: u.answers_done || 0, polls: u.polls_done || 0,
+      active: u.is_active ? 'Y' : 'N', score: u.is_active ? (u.score || 0) : ''
+    }));
+    if (env.AMS_WEBHOOK_URL) {
+      try {
+        await fetch(env.AMS_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type: 'members', members: members })
+        });
+      } catch (e) {}
+    }
+    return json({ success: true, count: members.length });
+  }
+  if (path === '/api/admin/set-admin' && method === 'POST') {
+    const adminId = await requireAdmin(request, env);
+    if (!adminId) return json({ error: 'Forbidden' }, 403);
+    const { user_id, is_admin } = await request.json();
+    if (Number(user_id) === Number(adminId) && !is_admin) return json({ error: 'You cannot remove your own admin status.' }, 400);
+    await env.DB.prepare('UPDATE users SET is_admin = ? WHERE id = ?').bind(is_admin ? 1 : 0, user_id).run();
+    return json({ success: true });
+  }
+  if (path === '/api/admin/reset-password' && method === 'POST') {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { user_id, new_password } = await request.json();
+    if (!new_password || String(new_password).length < 8) return json({ error: 'Password must be 8+ characters.' }, 400);
+    const hash = await hashPassword(new_password);
+    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hash, user_id).run();
+    return json({ success: true });
   }
   if (path === '/api/admin/reports' && method === 'GET') {
-    return await handleAdminReports(request, env);
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const res = await env.DB.prepare(`SELECT r.id, r.reason, r.created_at, r.resolved, p.content as post_content, p.id as post_id, p.user_id, u.name as reporter_name, au.name as reported_user_name FROM reports r LEFT JOIN posts p ON r.post_id = p.id LEFT JOIN users u ON r.reporter_id = u.id LEFT JOIN users au ON p.user_id = au.id ORDER BY r.resolved ASC, r.created_at DESC LIMIT 50`).all();
+    return json(res.results);
   }
   if (path === '/api/admin/reports/resolve' && method === 'POST') {
-    return await handleAdminResolveReport(request, env);
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { report_id, resolved } = await request.json();
+    await env.DB.prepare('UPDATE reports SET resolved = ? WHERE id = ?').bind(resolved ? 1 : 0, report_id).run();
+    return json({ success: true });
   }
   if (path === '/api/admin/reports/delete' && method === 'POST') {
-    return await handleAdminDeleteReport(request, env);
-  }
-
-  return json({ error: 'Endpoint not found.' }, 404);
-}
-
-// ============================================================================
-// HANDLERS: AUTH
-// ============================================================================
-
-async function handleLogin(request, env) {
-  const { email, password } = await request.json();
-  const cleanEmail = String(email || '').trim().toLowerCase();
-
-  if (!cleanEmail || !password) {
-    return json({ error: 'Email and password required.' }, 400);
-  }
-
-  const user = await env.DB.prepare('SELECT * FROM users WHERE LOWER(email) = ?')
-    .bind(cleanEmail)
-    .first();
-
-  if (!user) {
-    return json({ error: 'No account found for this email. Check spelling or create an account.' }, 404);
-  }
-
-  const inputHash = await hashPassword(password);
-  const isValid = (user.password === inputHash) || (password === user.email);
-
-  if (!isValid) {
-    return json({ error: 'Incorrect password for this account.' }, 401);
-  }
-
-  if (user.status === 'Banned') {
-    return json({ error: 'This account has been banned. Please contact the administrator.' }, 403);
-  }
-
-  await env.DB.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(user.id).run();
-
-  const token = user.id + ':' + crypto.randomUUID();
-  await env.DB.prepare("UPDATE users SET auth_token = ? WHERE id = ?").bind(token, user.id).run();
-
-  return json({
-    token,
-    name: user.name,
-    email: user.email,
-    member_number: String(user.member_number || '1'),
-    status: user.status || 'Approved',
-    is_admin: !!user.is_admin,
-    is_paid: !!user.is_paid
-  });
-}
-
-async function handleSignup(request, env, ctx) {
-  const { name, email, password } = await request.json();
-  const cleanEmail = String(email || '').trim().toLowerCase();
-
-  if (!cleanEmail || !password || password.length < 8) {
-    return json({ error: 'Valid email and password (8+ characters) required.' }, 400);
-  }
-
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE LOWER(email) = ?').bind(cleanEmail).first();
-  if (existing) {
-    return json({ error: 'An account with this email already exists. Please log in.' }, 409);
-  }
-
-  const countRow = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
-  const nextNum = (countRow ? countRow.c : 0) + 1;
-  const isFirstUser = nextNum === 1;
-  const hash = await hashPassword(password);
-
-  await env.DB.prepare(`
-    INSERT INTO users (name, email, password, member_number, status, is_admin, is_paid, created_at, last_seen)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-  `).bind(
-    name || 'Classmate',
-    cleanEmail,
-    hash,
-    String(nextNum),
-    isFirstUser ? 'Approved' : 'Pending',
-    isFirstUser ? 1 : 0,
-    isFirstUser ? 1 : 0
-  ).run();
-
-  const newUser = await env.DB.prepare('SELECT * FROM users WHERE LOWER(email) = ?').bind(cleanEmail).first();
-  const token = newUser.id + ':' + crypto.randomUUID();
-  await env.DB.prepare('UPDATE users SET auth_token = ? WHERE id = ?').bind(token, newUser.id).run();
-
-  if (env.AMS_WEBHOOK_URL) {
-    ctx.waitUntil(syncMemberWebhook(env.AMS_WEBHOOK_URL, {
-      name: newUser.name,
-      email: newUser.email,
-      member_number: newUser.member_number,
-      status: newUser.status,
-      active: newUser.is_paid ? 'Paid' : 'Free',
-      joined: new Date().toISOString().slice(0, 10)
-    }));
-  }
-
-  return json({
-    token,
-    name: newUser.name,
-    email: newUser.email,
-    member_number: String(newUser.member_number),
-    status: newUser.status,
-    is_admin: !!newUser.is_admin,
-    is_paid: !!newUser.is_paid
-  });
-}
-
-async function handleChangePassword(request, env, ctx) {
-  const user = await authenticate(request, env);
-  if (!user) return json({ error: 'Please log in again.' }, 401);
-
-  const { currentPassword, newPassword, newName } = await request.json();
-  const cleanName = String(newName || '').trim();
-
-  if (!cleanName && !newPassword) return json({ error: 'Provide a display name or new password.' }, 400);
-
-  const currentHash = await hashPassword(currentPassword || '');
-  const isValid = (user.password === currentHash) || (currentPassword === user.email);
-  if (!isValid) return json({ error: 'Current password is incorrect.' }, 400);
-
-  if (newPassword) {
-    if (newPassword.length < 8) return json({ error: 'New password must be 8+ characters.' }, 400);
-    const newHash = await hashPassword(newPassword);
-    await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(newHash, user.id).run();
-  }
-
-  if (cleanName) {
-    await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(cleanName, user.id).run();
-  }
-
-  return json({ success: true });
-}
-
-async function handleHeartbeat(request, env) {
-  const user = await authenticate(request, env);
-  if (user) {
-    await env.DB.prepare("UPDATE users SET last_seen = datetime('now') WHERE id = ?").bind(user.id).run();
-  }
-  return json({ ok: true });
-}
-
-// ============================================================================
-// HANDLERS: POSTS
-// ============================================================================
-
-async function handleGetPosts(request, env) {
-  const rows = await env.DB.prepare(`SELECT id, user_name, content, created_at FROM posts ORDER BY id DESC LIMIT 50`).all();
-  return json(rows.results || []);
-}
-
-async function handleCreatePost(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) return json({ error: 'Unauthorized.' }, 401);
-
-  const { content } = await request.json();
-  if (!content || !content.trim()) return json({ error: 'Post content required.' }, 400);
-
-  await env.DB.prepare(`INSERT INTO posts (user_id, user_name, content, created_at) VALUES (?, ?, ?, datetime('now'))`)
-    .bind(user.id, user.name, content.trim()).run();
-
-  return json({ ok: true });
-}
-
-async function handleDeletePost(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Admin only.' }, 403);
-  const { post_id } = await request.json();
-  await env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(post_id).run();
-  return json({ success: true });
-}
-
-// ============================================================================
-// HANDLERS: SITE ADMINISTRATION
-// ============================================================================
-
-async function handleAdminStats(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const uCount = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
-  const pCount = await env.DB.prepare('SELECT COUNT(*) as c FROM posts').first();
-  let rCount = { c: 0 };
-  try { rCount = await env.DB.prepare('SELECT COUNT(*) as c FROM reports WHERE resolved = 0').first() || { c: 0 }; } catch (e) {}
-  const aCount = await env.DB.prepare("SELECT COUNT(*) as c FROM users WHERE last_seen >= datetime('now', '-5 minutes')").first();
-
-  return json({
-    users: uCount ? uCount.c : 0,
-    posts: pCount ? pCount.c : 0,
-    reports: rCount ? rCount.c : 0,
-    active: aCount ? aCount.c : 0
-  });
-}
-
-async function handleAdminAnalytics(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const totalUsers = await env.DB.prepare('SELECT COUNT(*) as c FROM users').first();
-  const totalPosts = await env.DB.prepare('SELECT COUNT(*) as c FROM posts').first();
-  const totalCount = totalUsers?.c || 0;
-  const postsCount = totalPosts?.c || 0;
-
-  return json({
-    totalUsers: totalCount,
-    activeLearners: totalCount > 0 ? totalCount : 0,
-    eliteRate: 0,
-    engagement: totalCount > 0 ? (postsCount / totalCount).toFixed(1) : '0.0',
-    healthRatio: '0.00'
-  });
-}
-
-async function handleAdminUsers(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const rows = await env.DB.prepare(`
-    SELECT u.id, u.member_number, u.name, u.email, u.status, u.is_admin, u.is_paid, u.created_at, u.last_seen,
-      (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
-      0 as modules_done,
-      0 as lessons_done
-    FROM users u
-    ORDER BY CASE WHEN u.status = 'Pending' THEN 0 ELSE 1 END ASC, CAST(u.member_number AS INTEGER) ASC
-  `).all();
-
-  return json(rows.results || []);
-}
-
-async function handleAdminSetStatus(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const { user_id, status } = await request.json();
-  await env.DB.prepare('UPDATE users SET status = ? WHERE id = ?').bind(status, user_id).run();
-  return json({ success: true });
-}
-
-async function handleAdminSetPaid(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const { user_id, is_paid } = await request.json();
-  await env.DB.prepare('UPDATE users SET is_paid = ? WHERE id = ?').bind(is_paid ? 1 : 0, user_id).run();
-  return json({ success: true });
-}
-
-async function handleAdminSetAdmin(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const { user_id, is_admin } = await request.json();
-  await env.DB.prepare('UPDATE users SET is_admin = ? WHERE id = ?').bind(is_admin ? 1 : 0, user_id).run();
-  return json({ success: true });
-}
-
-async function handleAdminResetPassword(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-
-  const { user_id, new_password } = await request.json();
-  if (!user_id || !new_password || new_password.length < 8) return json({ error: 'Password must be 8+ characters.' }, 400);
-
-  const hash = await hashPassword(new_password);
-  await env.DB.prepare('UPDATE users SET password = ? WHERE id = ?').bind(hash, user_id).run();
-  return json({ success: true });
-}
-
-async function handleAdminSyncMembers(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-  if (!env.AMS_WEBHOOK_URL) return json({ error: 'AMS_WEBHOOK_URL not configured.' }, 400);
-
-  const users = await env.DB.prepare('SELECT * FROM users ORDER BY CAST(member_number AS INTEGER) ASC').all();
-  const members = (users.results || []).map(u => ({
-    email: u.email,
-    name: u.name,
-    joined: (u.created_at || '').slice(0, 10),
-    status: u.status,
-    member_number: u.member_number,
-    active: u.is_paid ? 'Paid' : 'Free'
-  }));
-
-  const res = await fetch(env.AMS_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'members', members })
-  });
-
-  return json({ success: res.ok, count: members.length });
-}
-
-async function handleAdminReports(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-  try {
-    const res = await env.DB.prepare(`SELECT * FROM reports ORDER BY id DESC LIMIT 50`).all();
-    return json(res.results || []);
-  } catch (e) {
-    return json([]);
-  }
-}
-
-async function handleAdminResolveReport(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-  const { report_id, resolved } = await request.json();
-  try {
-    await env.DB.prepare('UPDATE reports SET resolved = ? WHERE id = ?').bind(resolved, report_id).run();
-  } catch (e) {}
-  return json({ success: true });
-}
-
-async function handleAdminDeleteReport(request, env) {
-  const admin = await authenticateAdmin(request, env);
-  if (!admin) return json({ error: 'Unauthorized.' }, 403);
-  const { report_id } = await request.json();
-  try {
+    if (!await requireAdmin(request, env)) return json({ error: 'Forbidden' }, 403);
+    const { report_id } = await request.json();
     await env.DB.prepare('DELETE FROM reports WHERE id = ?').bind(report_id).run();
-  } catch (e) {}
-  return json({ success: true });
-}
-
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-async function authenticate(request, env) {
-  const header = request.headers.get('Authorization') || '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
-  return await env.DB.prepare('SELECT * FROM users WHERE auth_token = ?').bind(token).first();
-}
-
-async function authenticateAdmin(request, env) {
-  const user = await authenticate(request, env);
-  if (!user) return null;
-  if (user.is_admin === 1 || String(user.member_number) === '1') {
-    return user;
+    return json({ success: true });
   }
-  return null;
+
+  return json({ error: 'Not found.' }, 404);
 }
 
-async function hashPassword(str) {
-  const enc = new TextEncoder().encode(str + '_cict_salt');
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+const SCORE_SQL = `(SELECT COUNT(*) FROM progress p WHERE p.user_id = u.id AND ((p.type IN ('module_completion','lesson_completion') AND p.completed = 1) OR (p.type IN ('answer','poll') AND TRIM(p.note) <> '')))`;
+async function scoreOf(env, userId) {
+  const r = await env.DB.prepare(`SELECT ${SCORE_SQL} AS s FROM users u WHERE u.id = ?`).bind(userId).first();
+  return r?.s || 0;
 }
-
+async function refScore(env) {
+  const ref = await env.DB.prepare('SELECT id FROM users WHERE is_admin = 1 ORDER BY user_number ASC LIMIT 1').first();
+  if (!ref) return 0;
+  return await scoreOf(env, ref.id);
+}
+async function memberRow(env, userId) {
+  return await env.DB.prepare(`SELECT u.email, u.name, u.created_at, u.status, u.user_number, u.is_active,
+    (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) as post_count,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'module_completion' AND pr.completed = 1) as modules_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'lesson_completion' AND pr.completed = 1) as lessons_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'answer' AND TRIM(pr.note) <> '') as answers_done,
+    (SELECT COUNT(*) FROM progress pr WHERE pr.user_id = u.id AND pr.type = 'poll' AND TRIM(pr.note) <> '') as polls_done,
+    ${SCORE_SQL} as score
+    FROM users u WHERE u.id = ?`).bind(userId).first();
+}
+async function gateUser(request, env) {
+  const userId = await auth(request, env);
+  if (!userId) return { id: null, status: null };
+  const u = await env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(userId).first();
+  return { id: userId, status: u ? u.status : 'Approved' };
+}
+function gateError(status) {
+  return status === 'Banned' ? 'This account has been Banned. Talk to DrWarren or his team.' : 'Your access is Pending admin approval. Talk to DrWarren or his team.';
+}
+async function requireAdmin(request, env) {
+  const g = await gateUser(request, env);
+  if (!g.id || g.status !== 'Approved') return null;
+  const user = await env.DB.prepare('SELECT is_admin FROM users WHERE id = ?').bind(g.id).first();
+  if (!user || !user.is_admin) return null;
+  return g.id;
+}
+async function auth(request, env) {
+  const header = request.headers.get('Authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  const s = await env.DB.prepare('SELECT user_id FROM sessions WHERE token = ?').bind(token).first();
+  return s ? s.user_id : null;
+}
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-    }
-  });
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
-
-function handleCors() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
-    }
-  });
-}
-
-async function syncMemberWebhook(url, member) {
+async function syncSheet(webhookUrl, email, name, user_number, lesson, progress) {
   try {
-    await fetch(url, {
+    await fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'member', ...member })
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ email, name, user_number, lesson, progress })
+    });
+  } catch (e) {}
+}
+async function syncMember(env, u) {
+  if (!env.AMS_WEBHOOK_URL || !u) return;
+  try {
+    await fetch(env.AMS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        type: 'member',
+        email: u.email,
+        name: u.name,
+        joined: (u.created_at || '').slice(0, 10),
+        status: u.status,
+        user_number: u.user_number,
+        posts: u.post_count || 0,
+        modules: u.modules_done || 0,
+        lessons: u.lessons_done || 0,
+        answers: u.answers_done || 0,
+        polls: u.polls_done || 0,
+        active: u.is_active ? 'Y' : 'N',
+        score: u.is_active ? (u.score || 0) : ''
+      })
     });
   } catch (e) {}
 }
