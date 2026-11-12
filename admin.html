@@ -24,6 +24,7 @@
   button[disabled]{opacity:.35;cursor:not-allowed;}
   .btn-magenta{background:var(--magenta);color:#fff;} .btn-navy{background:var(--navy);color:#fff;}
   .btn-ghost{background:#fff;color:var(--navy);border:2px solid var(--navy);} .btn-red{background:var(--red);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;} .btn-amber{background:var(--amber);color:#fff;}
   .btn-mini{padding:5px 8px;font-size:.68rem;line-height:1.15;border-radius:8px;white-space:normal;min-width:56px;text-align:center;}
   .badge{border-radius:6px;padding:2px 8px;font-size:.7rem;font-weight:700;margin-left:6px;color:#fff;background:var(--navy);}
   .badge.m{background:var(--magenta);} .badge.r{background:var(--red);} .badge.p{background:var(--amber);} .badge.g{background:var(--green);}
@@ -125,20 +126,19 @@ async function loadAll(){
      <div class="card"><b>${analytics.engagement||0}</b><span>Engagement</span></div>
      <div class="card"><b>${analytics.healthRatio||0}</b><span>Health ratio</span></div>`:'';
   $('members').innerHTML=(Array.isArray(users)&&users.length)?users.map(u=>{
-    const sb=u.status==='Approved'?'g':(u.status==='Banned'?'r':'p');
     const on=isOnline(u.last_seen);
+    const st=u.status==='Approved'?'Approved':(u.status==='Banned'?'Banned':'Pending');
     return `<div class="row"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
       <b>${esc(u.member_number)} ${esc(u.name)}</b>
       <span class="dot ${on?'on':'off'}" title="${on?'On the site now':'Last seen '+(u.last_seen||'never')}"></span>
-      <span class="badge ${sb}">${esc(u.status||'Pending').toUpperCase()}</span>
       ${u.is_admin?'<span class="badge m">ADMIN</span>':''}
       <span class="chip">Posts ${u.post_count||0}</span><span class="chip">Modules ${u.modules_done||0}</span><span class="chip">Lessons ${u.lessons_done||0}</span>
       <span class="muted">${esc(u.email)} &middot; joined ${esc((u.created_at||'').slice(0,10))}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
         <button class="${u.is_active?'btn-navy':'btn-ghost'} btn-mini" onclick="act('/api/admin/set-active',{user_id:${u.id},is_active:${u.is_active?0:1}})">Active</button>
-        <button class="btn-navy btn-mini" ${u.status==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">Approve</button>
-        <button class="btn-ghost btn-mini" ${u.status==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Pending</button>
-        <button class="btn-red btn-mini" ${u.status==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Banned</button>
+        <button class="${st==='Approved'?'btn-green':'btn-navy'} btn-mini" ${st==='Approved'?'disabled':''} onclick="setStatus(${u.id},'Approved')">${st==='Approved'?'Approved':'Approve'}</button>
+        <button class="${st==='Pending'?'btn-amber':'btn-ghost'} btn-mini" ${st==='Pending'?'disabled':''} onclick="setStatus(${u.id},'Pending')">Pending</button>
+        <button class="btn-red btn-mini" ${st==='Banned'?'disabled':''} onclick="setStatus(${u.id},'Banned')">Banned</button>
         <label class="chk"><input type="checkbox" ${u.is_admin?'checked':''} onchange="act('/api/admin/set-admin',{user_id:${u.id},is_admin:this.checked?1:0})"> Admin</label>
         <button class="btn-ghost btn-mini" onclick="resetPw(${u.id})">Reset PW</button>
       </div></div>`;}).join('')
