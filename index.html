@@ -1,7 +1,5 @@
 
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -872,8 +870,7 @@ function renderCourse(){
             } else if (type === 'link') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
             } else if (type === 'image') {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><img src="${content}" style="max-width:100%; border-radius:8px;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra2}</p>`;
-            } else if (type === 'bullets' || type === 'bulllets') {
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div><img src="${extra2}" style="max-width:100%; border-radius:8px; margin:12px 0;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra1}</p>`;            } else if (type === 'bullets' || type === 'bulllets') {
                 const items = content.split(/\n|\|/).map(line => `<li>${linkify(line.trim())}</li>`).filter(l => l !== '<li></li>').join('');
                 div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
             } else if (type === 'numbers') {
