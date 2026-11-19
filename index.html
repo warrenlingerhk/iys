@@ -221,8 +221,130 @@ window.addEventListener('error', function (ev) {
   });
 })();
 </script>
-<script src="/module-pill.js"></script>
-<body>
+<script>
+(function () {
+  var st = document.createElement('style');
+  st.textContent = [
+    '.module-header{position:relative}',
+    '.mep{position:absolute;right:14px;top:50%;',
+    'transform:translateY(-50%);',
+    'display:inline-flex;align-items:center;gap:6px;',
+    'background:#fff;color:#023E8A;',
+    'border:2px solid #90E0EF;border-radius:999px;',
+    'padding:5px 13px;cursor:pointer;',
+    'font:800 .82rem "Nunito Sans",sans-serif;',
+    'box-shadow:0 3px 0 rgba(2,62,138,.28)}',
+    '.mep:hover{background:#90E0EF}',
+    '.mep:active{transform:translateY(-50%) scale(.95)}',
+    '.mep:focus-visible{outline:3px solid #E600FF;',
+    'outline-offset:2px}',
+    '.mep svg{transition:transform .25s}',
+    '.mep.open svg{transform:rotate(180deg)}',
+    '@media(max-width:700px){.mep{position:static;',
+    'transform:none;margin-top:12px}',
+    '.mep:active{transform:scale(.95)}}'
+  ].join('');
+  document.head.appendChild(st);
+  function cnt(b) {
+    var k = b.children;
+    for (var i = 0; i < k.length; i++) {
+      if (k[i].classList.contains('expandable-content'))
+        return k[i];
+    }
+    return null;
+  }
+  function list(sec) {
+    var q = '.mod-items > .mod-item > .expandable-box';
+    return [].slice.call(sec.querySelectorAll(q));
+  }
+  function sync(sec) {
+    var p = sec.querySelector('.mep');
+    if (!p) return;
+    var bs = list(sec);
+    var open = bs.length > 0;
+    for (var i = 0; i < bs.length; i++) {
+      var c = cnt(bs[i]);
+      if (!c || !c.classList.contains('expanded'))
+        open = false;
+    }
+    var t = p.querySelector('.mep-t');
+    if (t) t.textContent = open ? 'Collapse' : 'Expand';
+    p.classList.toggle('open', open);
+    p.setAttribute('aria-expanded',
+      open ? 'true' : 'false');
+  }
+  function flip(n) {
+    var sec = document.getElementById('mod-section-' + n);
+    if (!sec) return;
+    var bs = list(sec);
+    if (!bs.length) return;
+    var shut = false;
+    for (var i = 0; i < bs.length; i++) {
+      var c = cnt(bs[i]);
+      if (c && !c.classList.contains('expanded'))
+        shut = true;
+    }
+    for (var j = 0; j < bs.length; j++) {
+      var d = cnt(bs[j]);
+      if (!d) continue;
+      if (shut) d.classList.add('expanded');
+      else d.classList.remove('expanded');
+    }
+    sync(sec);
+  }
+  function add() {
+    var secs = document.querySelectorAll('.module-section');
+    for (var i = 0; i < secs.length; i++) {
+      var sec = secs[i];
+      if (sec.querySelector('.mep')) { sync(sec); continue; }
+      if (!list(sec).length) continue;
+      var n = sec.id.replace('mod-section-', '');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mep';
+      b.setAttribute('aria-expanded', 'false');
+      b.setAttribute('aria-label', 'Expand all topics');
+      b.innerHTML = '<span class="mep-t">Expand</span>' +
+        '<svg width="13" height="13" viewBox="0 0 24 24"' +
+        ' fill="none" stroke="currentColor"' +
+        ' stroke-width="3">' +
+        '<polyline points="6 9 12 15 18 9">' +
+        '</polyline></svg>';
+      b.onclick = (function (m) {
+        return function () { flip(m); };
+      })(n);
+      var h = sec.querySelector('.module-header');
+      if (h) h.appendChild(b);
+    }
+  }
+  function hook() {
+    var f = window.renderCourse;
+    if (typeof f !== 'function' || f.__mep) return;
+    window.renderCourse = function () {
+      var r = f.apply(this, arguments);
+      add();
+      return r;
+    };
+    window.renderCourse.__mep = true;
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var h = t.closest('.expandable-header');
+    if (!h) return;
+    var sec = h.closest('.module-section');
+    if (sec) setTimeout(function () { sync(sec); }, 0);
+  });
+  hook();
+  var tk = localStorage.getItem('token');
+  if (tk) {
+    fetch('/api/heartbeat', {
+      headers: { 'Authorization': 'Bearer ' + tk }
+    }).catch(function () {});
+  }
+})();
+</script>
+</body>
 
 <header class="site-head">
   <div class="head-in wrap">
