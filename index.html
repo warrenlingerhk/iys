@@ -86,8 +86,10 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .score-pill{background:#fff;color:var(--navy);border:2px solid var(--pink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .loc-pill{background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-.module-header{padding:40px 30px; text-align:center}
+.module-header{padding:40px 30px; text-align:center; position:relative;}
 .module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
+.module-expand-pill{position:absolute; right:20px; top:50%; transform:translateY(-50%); background:#fff; color:var(--navy); border:2px solid var(--lightBlue); border-radius:999px; padding:4px 14px; font-weight:800; font-size:.85rem; cursor:pointer;}
+.module-expand-pill:hover{background:var(--lightBlue);}
 .mod-item{background:#fff; color:var(--navy); padding:24px 26px; margin:0; border-bottom:1px solid rgba(2,62,138,0.1)}
 .mod-item:last-child{border-bottom:none}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
@@ -135,7 +137,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .anim-controls{margin-top:12px;}
 .anim-missing{background:var(--cream);border:2px dashed var(--slate);border-radius:10px;padding:14px;color:var(--slate);font-weight:700;}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
-@media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;} .module-expand-pill{position:static; transform:none; margin-top:10px;}}
 </style>
 </head>
 <script>
@@ -364,7 +366,7 @@ const LESSON_CSV_URLS = {
   'L18': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSFHH9lNFDLhX6iceN95XnUuCk92zA4gSC8X5OijbuXUlPYFYPzIOMdm_gwDKc4ACjUsbE8mc1kQUeZ/pub?output=csv',
   'L19': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTHpnaBBZ72E0scz3QcrWT1ly4PMPoak8NQ63XJzvpQagE4pGK-uuUjR16sb69UAaHAGt6dXcnwL1Lx/pub?output=csv',
   'L20': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTRFtakTOQvZYOvtbxHPINw-VFJegljDrrIo1JT6hbc2LfykKbyTAoo3XmUzHmn5pl7rWf1UGDvN7AH/pub?output=csv',
-  'L21': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa-G-VBiqOwBv82pcmxtYRnHDNHFUslDIxls9O_7DEeC-WLgm2gf1WsIUx5wYPiOq23Zd_WWb8oYo2/pub?output=csv',
+  'L21': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSa-G-VBiqOwBv82pcmxtYRnHDNHFUslDIxls9O_7DEeC-WLgm2gf1WsIUx5wWPiOq23Zd_WWb8oYo2/pub?output=csv',
   'L22': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQHeFDmaAq6wTvggqOtBmdZbGRqIrP0arDETnMVJ-nXIqihGgY97FCbrsQdl333J238fM_vXP8b7VS_/pub?output=csv',
   'L23': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS-f97DMNyK2EkZf5q0kCw_y4-GEGDv1o9Xdy73C2EF0dYi6ibk5FpBquRAMBs2l959mB3hzwLMSseM/pub?output=csv',
   'L24': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQjFZnZm9MTgt2zGr84ned4bSebQkvVW-drHTGTn4n9DMtwfVbV4uonbMRb8k0850elTXK3HBPL4-D/pub?output=csv',
@@ -414,6 +416,22 @@ function updateLocPill(){
     anchor.insertAdjacentElement('afterend', el);
   }
   el.textContent = currentLessonId || '';
+}
+
+/* ---------- MODULE EXPAND/COLLAPSE PILL ---------- */
+function toggleModuleExpand(modNum){
+  const section = document.getElementById('mod-section-' + modNum);
+  if (!section) return;
+  const boxes = section.querySelectorAll(':scope > .mod-items > .mod-item > .expandable-box');
+  if (!boxes.length) return;
+  const anyCollapsed = Array.from(boxes).some(b => !b.querySelector('.expandable-content').classList.contains('expanded'));
+  boxes.forEach(b => {
+    const content = b.querySelector('.expandable-content');
+    if (anyCollapsed) content.classList.add('expanded');
+    else content.classList.remove('expanded');
+  });
+  const pill = document.getElementById('expand-pill-' + modNum);
+  if (pill) pill.textContent = anyCollapsed ? 'Collapse' : 'Expand';
 }
 
 /* ---------- POLL RESULTS CHART (visible only after own vote) ---------- */
@@ -819,6 +837,7 @@ function renderCourse(){
         section.innerHTML = `
             <div class="module-header">
                 <h2>Module ${modNum}</h2>
+                <button class="module-expand-pill" id="expand-pill-${modNum}" onclick="toggleModuleExpand(${modNum})">Expand</button>
             </div>
             <div class="mod-items" id="items-mod-${modNum}"></div>
             <div class="module-check-container">
@@ -843,7 +862,6 @@ function renderCourse(){
 
             if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
 
-            // Clean ID slug
             const id = (currentLessonId + '_' + title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 
             const div = document.createElement('div');
@@ -870,177 +888,6 @@ function renderCourse(){
             } else if (type === 'link') {
                 div.innerHTML = `<h3 class="item-title">${title}</h3><a href="${content}" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">${extra1 || 'Open Link'}</a>`;
             } else if (type === 'image') {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div><img src="${extra2}" style="max-width:100%; border-radius:8px; margin:12px 0;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra1}</p>`;            } else if (type === 'bullets' || type === 'bulllets') {
-                const items = content.split(/\n|\|/).map(line => `<li>${linkify(line.trim())}</li>`).filter(l => l !== '<li></li>').join('');
-                div.innerHTML = `<h3 class="item-title">${title}</h3><ul style="margin-left:20px; list-style:disc;">${items}</ul>`;
-            } else if (type === 'numbers') {
-                const items = content.split(/\n|\|/).map(line => `<li>${linkify(line.trim())}</li>`).filter(l => l !== '<li></li>').join('');
-                div.innerHTML = `<h3 class="item-title">${title}</h3><ol style="margin-left:20px;">${items}</ol>`;
-            } else if (type === 'title') {
-                div.innerHTML = `<h3 class="item-title" style="font-size:1.4rem">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-            } else if (type === 'animation') {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="anim-host"></div>`;
-            } else {
-                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div>`;
-            }
-            itemsHost.appendChild(div);
-            if (type === 'animation' && window.IYS_ANIM && window.IYS_ANIM.mount) window.IYS_ANIM.mount(div.querySelector('.anim-host'), content);
-        });
-    });
-
-    loadProgress();
-    updateLessonCheck();
-}
-
-function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); updateLessonCheck(); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
-function updateLessonCheck(){
-  const lessonCheck = document.getElementById('lesson-check');
-  const hint = document.getElementById('lesson-hint');
-  if (!lessonCheck) return;
-  const mods = Array.from(document.querySelectorAll('[id^="module-check-"]'));
-  const answers = Array.from(document.querySelectorAll('.mod-item[data-format="answer"] .answer-input'));
-  const modsLeft = mods.filter(m => !m.checked).length;
-  const answersLeft = answers.filter(a => !a.value.trim()).length;
-  const unlocked = modsLeft === 0 && answersLeft === 0;
-  lessonCheck.disabled = !unlocked && !lessonCheck.checked;
-  if (hint) {
-    if (lessonCheck.checked) hint.innerText = 'Lesson marked complete. Great work!';
-    else if (unlocked) hint.innerText = 'All requirements met — you can mark this lesson complete.';
-    else {
-      const parts = [];
-      if (modsLeft > 0) parts.push(modsLeft + ' module' + (modsLeft > 1 ? 's' : '') + ' to check');
-      if (answersLeft > 0) parts.push(answersLeft + ' answer box' + (answersLeft > 1 ? 'es' : '') + ' to fill');
-      hint.innerText = 'Unlock by finishing: ' + parts.join(' and ') + '.';
-    }
-  }
-}
-function setStatus(text, cls){ const el = document.getElementById('save-status'); el.innerText = text; el.className = 'save-status ' + (cls || ''); }
-
-async function saveProgress(){
-  setStatus('Saving…', 'save-warn');
-  const progress = [];
-
-  // 1. Module completion checkboxes
-  document.querySelectorAll('[id^="module-check-"]').forEach(check => {
-    progress.push({
-      item_id: (currentLessonId + '_module_' + check.dataset.module).toLowerCase(),
-      header_name: 'M' + check.dataset.module,
-      format: 'module',
-      type: 'module_completion',
-      completed: check.checked ? 1 : 0,
-      note: ''
-    });
-  });
-
-  // 1b. Lesson completion checkbox
-  const lessonCheck = document.getElementById('lesson-check');
-  if (lessonCheck) {
-    progress.push({
-      item_id: (currentLessonId + '_lesson_complete').toLowerCase(),
-      header_name: 'Lesson',
-      format: 'lesson',
-      type: 'lesson_completion',
-      completed: lessonCheck.checked ? 1 : 0,
-      note: ''
-    });
-  }
-
-  // 2. Mod items (Answers & Polls)
-  document.querySelectorAll('.mod-item').forEach(item => {
-    const format = item.dataset.format;
-    if (format === 'answer') {
-      const noteEl = item.querySelector('.answer-input');
-      progress.push({
-        item_id: item.dataset.id,
-        header_name: item.dataset.header,
-        format: 'answer',
-        type: 'answer',
-        completed: 0,
-        note: noteEl ? noteEl.value : ''
-      });
-    } else if (format === 'poll') {
-      const selected = Array.from(item.querySelectorAll('input:checked')).map(i => i.value);
-      progress.push({
-        item_id: item.dataset.id,
-        header_name: item.dataset.header,
-        format: 'poll',
-        type: 'poll',
-        completed: 0,
-        note: selected.join('|')
-      });
-    }
-  });
-
-  try {
-    const res = await fetch('/api/progress', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-      body: JSON.stringify({ lesson: currentLessonId, progress: progress })
-    });
-    if (res.ok) { setStatus('All changes saved.', ''); refreshMe(); updatePollCharts(); } else setStatus('Error saving!', 'save-warn');
-  } catch (e) { setStatus('Error saving!', 'save-warn'); }
-}
-
-async function loadProgress(){
-  try {
-    const res = await fetch('/api/progress', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
-
-    data.forEach(saved => {
-      // 1. Restore module checkboxes
-      if (saved.type === 'module_completion') {
-        const prefix = (currentLessonId + '_module_').toLowerCase();
-        if (saved.item_id.startsWith(prefix)) {
-          const modNum = saved.item_id.replace(prefix, '');
-          const check = document.getElementById(`module-check-${modNum}`);
-          if (check) check.checked = saved.completed === 1;
-        }
-      }
-
-      // 2. Restore items by data-id
-      const item = document.querySelector('.mod-item[data-id="' + saved.item_id + '"]');
-      if (item) {
-        if (saved.type === 'answer') {
-          const noteEl = item.querySelector('.answer-input');
-          if (noteEl) noteEl.value = saved.note || '';
-        } else if (saved.type === 'poll') {
-          const selected = (saved.note || '').split('|');
-          item.querySelectorAll('input').forEach(inp => {
-            inp.checked = selected.includes(inp.value);
-          });
-        }
-      }
-    });
-
-    const lessonSaved = data.find(s => s.type === 'lesson_completion' && s.item_id === (currentLessonId + '_lesson_complete').toLowerCase());
-    const lessonCheck = document.getElementById('lesson-check');
-    if (lessonCheck && lessonSaved) lessonCheck.checked = lessonSaved.completed === 1;
-    setStatus('All changes saved.', '');
-    updateLessonCheck();
-    updatePollCharts();
-  } catch (e) {
-    console.error('Error loading progress:', e);
-    updateLessonCheck();
-  }
-}
-
-async function parseCSV(text) {
-  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === '"') inQuotes = !inQuotes;
-    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; }
-    else if ((char === '\n' || char === '\r') && !inQuotes) { if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); } currentRow = []; currentCell = ''; if (char === '\r' && text[i+1] === '\n') i++; }
-    else currentCell += char;
-  }
-  if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
-  return rows;
-}
-
-setInterval(function(){ const t = localStorage.getItem('token'); if (t) fetch('/api/heartbeat', { headers:{'Authorization':'Bearer ' + t} }).catch(function(){}); }, 60000);
-showHome();
-</script>
-</body>
-</html>
+                div.innerHTML = `<h3 class="item-title">${title}</h3><div class="mod-content">${linkify(content)}</div><img src="${extra2}" style="max-width:100%; border-radius:8px; margin:12px 0;" alt="${title}"><p style="font-style:italic; color:var(--slate)">${extra1}</p>`;
+            } else if (type === 'bullets' || type === 'bulllets') {
+                const items = content.split(/\n|\|/).map(line => `<li>${
