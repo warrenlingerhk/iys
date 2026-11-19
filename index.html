@@ -1,5 +1,7 @@
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,14 +88,8 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .score-pill{background:#fff;color:var(--navy);border:2px solid var(--pink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .loc-pill{background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-.module-header{padding:40px 30px; text-align:center; position:relative;}
+.module-header{padding:40px 30px; text-align:center}
 .module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
-.module-expand-pill{position:absolute; right:18px; top:50%; transform:translateY(-50%); display:inline-flex; align-items:center; gap:7px; background:#fff; color:var(--navy); border:2px solid var(--lightBlue); border-radius:999px; padding:6px 15px; font:800 .85rem 'Nunito Sans',sans-serif; cursor:pointer; box-shadow:0 3px 0 rgba(2,62,138,.28); transition:background .2s, box-shadow .2s;}
-.module-expand-pill:hover{background:var(--lightBlue); box-shadow:0 3px 0 rgba(2,62,138,.4);}
-.module-expand-pill:active{transform:translateY(-50%) scale(.95);}
-.module-expand-pill:focus-visible{outline:3px solid var(--pink); outline-offset:2px;}
-.module-expand-pill svg{transition:transform .25s ease;}
-.module-expand-pill.open svg{transform:rotate(180deg);}
 .mod-item{background:#fff; color:var(--navy); padding:24px 26px; margin:0; border-bottom:1px solid rgba(2,62,138,0.1)}
 .mod-item:last-child{border-bottom:none}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
@@ -147,7 +143,7 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 #posts-host::-webkit-scrollbar-thumb:hover{background:var(--pink);}
 #boot-error{position:fixed;top:0;left:0;right:0;z-index:9999;background:#c62828;color:#fff;font:700 13px/1.5 'Nunito Sans',sans-serif;padding:10px 16px;box-shadow:0 4px 14px rgba(0,0,0,.3);}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
-@media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;} .module-expand-pill{position:static; transform:none; margin-top:14px;} .module-expand-pill:active{transform:scale(.95);}}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.module-menu{grid-template-columns:1fr; justify-items:center; row-gap:8px;} .module-menu .back-home{justify-self:center;} .save-status{justify-self:center; text-align:center;}}
 </style>
 </head>
 <script>
@@ -221,130 +217,7 @@ window.addEventListener('error', function (ev) {
   });
 })();
 </script>
-<script>
-(function () {
-  var st = document.createElement('style');
-  st.textContent = [
-    '.module-header{position:relative}',
-    '.mep{position:absolute;right:14px;top:50%;',
-    'transform:translateY(-50%);',
-    'display:inline-flex;align-items:center;gap:6px;',
-    'background:#fff;color:#023E8A;',
-    'border:2px solid #90E0EF;border-radius:999px;',
-    'padding:5px 13px;cursor:pointer;',
-    'font:800 .82rem "Nunito Sans",sans-serif;',
-    'box-shadow:0 3px 0 rgba(2,62,138,.28)}',
-    '.mep:hover{background:#90E0EF}',
-    '.mep:active{transform:translateY(-50%) scale(.95)}',
-    '.mep:focus-visible{outline:3px solid #E600FF;',
-    'outline-offset:2px}',
-    '.mep svg{transition:transform .25s}',
-    '.mep.open svg{transform:rotate(180deg)}',
-    '@media(max-width:700px){.mep{position:static;',
-    'transform:none;margin-top:12px}',
-    '.mep:active{transform:scale(.95)}}'
-  ].join('');
-  document.head.appendChild(st);
-  function cnt(b) {
-    var k = b.children;
-    for (var i = 0; i < k.length; i++) {
-      if (k[i].classList.contains('expandable-content'))
-        return k[i];
-    }
-    return null;
-  }
-  function list(sec) {
-    var q = '.mod-items > .mod-item > .expandable-box';
-    return [].slice.call(sec.querySelectorAll(q));
-  }
-  function sync(sec) {
-    var p = sec.querySelector('.mep');
-    if (!p) return;
-    var bs = list(sec);
-    var open = bs.length > 0;
-    for (var i = 0; i < bs.length; i++) {
-      var c = cnt(bs[i]);
-      if (!c || !c.classList.contains('expanded'))
-        open = false;
-    }
-    var t = p.querySelector('.mep-t');
-    if (t) t.textContent = open ? 'Collapse' : 'Expand';
-    p.classList.toggle('open', open);
-    p.setAttribute('aria-expanded',
-      open ? 'true' : 'false');
-  }
-  function flip(n) {
-    var sec = document.getElementById('mod-section-' + n);
-    if (!sec) return;
-    var bs = list(sec);
-    if (!bs.length) return;
-    var shut = false;
-    for (var i = 0; i < bs.length; i++) {
-      var c = cnt(bs[i]);
-      if (c && !c.classList.contains('expanded'))
-        shut = true;
-    }
-    for (var j = 0; j < bs.length; j++) {
-      var d = cnt(bs[j]);
-      if (!d) continue;
-      if (shut) d.classList.add('expanded');
-      else d.classList.remove('expanded');
-    }
-    sync(sec);
-  }
-  function add() {
-    var secs = document.querySelectorAll('.module-section');
-    for (var i = 0; i < secs.length; i++) {
-      var sec = secs[i];
-      if (sec.querySelector('.mep')) { sync(sec); continue; }
-      if (!list(sec).length) continue;
-      var n = sec.id.replace('mod-section-', '');
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'mep';
-      b.setAttribute('aria-expanded', 'false');
-      b.setAttribute('aria-label', 'Expand all topics');
-      b.innerHTML = '<span class="mep-t">Expand</span>' +
-        '<svg width="13" height="13" viewBox="0 0 24 24"' +
-        ' fill="none" stroke="currentColor"' +
-        ' stroke-width="3">' +
-        '<polyline points="6 9 12 15 18 9">' +
-        '</polyline></svg>';
-      b.onclick = (function (m) {
-        return function () { flip(m); };
-      })(n);
-      var h = sec.querySelector('.module-header');
-      if (h) h.appendChild(b);
-    }
-  }
-  function hook() {
-    var f = window.renderCourse;
-    if (typeof f !== 'function' || f.__mep) return;
-    window.renderCourse = function () {
-      var r = f.apply(this, arguments);
-      add();
-      return r;
-    };
-    window.renderCourse.__mep = true;
-  }
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    if (!t || !t.closest) return;
-    var h = t.closest('.expandable-header');
-    if (!h) return;
-    var sec = h.closest('.module-section');
-    if (sec) setTimeout(function () { sync(sec); }, 0);
-  });
-  hook();
-  var tk = localStorage.getItem('token');
-  if (tk) {
-    fetch('/api/heartbeat', {
-      headers: { 'Authorization': 'Bearer ' + tk }
-    }).catch(function () {});
-  }
-})();
-</script>
-</body>
+<body>
 
 <header class="site-head">
   <div class="head-in wrap">
@@ -545,41 +418,6 @@ function updateLocPill(){
     anchor.insertAdjacentElement('afterend', el);
   }
   el.textContent = currentLessonId || '';
-}
-
-/* ---------- MODULE EXPAND / COLLAPSE PILL ---------- */
-function boxContent(box){
-  for (const ch of box.children) { if (ch.classList.contains('expandable-content')) return ch; }
-  return null;
-}
-function firstLevelBoxes(section){
-  return Array.prototype.slice.call(section.querySelectorAll('.mod-items > .mod-item > .expandable-box'));
-}
-function syncModulePill(el){
-  const section = el && el.closest ? el.closest('.module-section') : null;
-  if (!section) return;
-  const pill = section.querySelector('.module-expand-pill');
-  if (!pill) return;
-  const boxes = firstLevelBoxes(section);
-  const allOpen = boxes.length > 0 && boxes.every(function(b){ const c = boxContent(b); return c && c.classList.contains('expanded'); });
-  const label = pill.querySelector('.mep-label');
-  if (label) label.textContent = allOpen ? 'Collapse' : 'Expand';
-  pill.classList.toggle('open', allOpen);
-  pill.setAttribute('aria-expanded', allOpen ? 'true' : 'false');
-}
-function toggleModuleExpand(modNum){
-  const section = document.getElementById('mod-section-' + modNum);
-  if (!section) return;
-  const boxes = firstLevelBoxes(section);
-  if (!boxes.length) return;
-  const anyClosed = boxes.some(function(b){ const c = boxContent(b); return c && !c.classList.contains('expanded'); });
-  boxes.forEach(function(b){
-    const c = boxContent(b);
-    if (!c) return;
-    if (anyClosed) c.classList.add('expanded');
-    else c.classList.remove('expanded');
-  });
-  syncModulePill(section);
 }
 
 async function updatePollCharts(){
@@ -897,3 +735,281 @@ async function signup() {
     if (data.token) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('iys_is_admin', data.is_admin);
+      localStorage.setItem('iys_name', name);
+      localStorage.setItem('iys_number', data.user_number || '');
+      localStorage.setItem('iys_status', data.status || 'Pending');
+      showHome();
+    } else { errEl.innerText = data.error || 'Error.'; }
+  } catch (e) { errEl.innerText = 'Network error.'; }
+}
+
+async function changePassword() {
+  const errEl = document.getElementById('cp-error'); errEl.innerText = '';
+  const newName = document.getElementById('cp-name').value.trim();
+  const currentPassword = document.getElementById('cp-current').value;
+  const newPassword = document.getElementById('cp-new').value;
+  const confirmNewPassword = document.getElementById('cp-new-confirm').value;
+  if (!newName && !newPassword && !confirmNewPassword) { errEl.innerText = 'Enter a new name, a new password, or both.'; return; }
+  if (!currentPassword) { errEl.innerText = 'Please enter your current password.'; return; }
+  if ((newPassword || confirmNewPassword) && newPassword !== confirmNewPassword) { errEl.innerText = 'New passwords do not match.'; return; }
+  if (newPassword && newPassword.length < 8) { errEl.innerText = 'New password must be 8+ characters.'; return; }
+  try {
+    const res = await fetch(API_URL + '/api/change-password', { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + localStorage.getItem('token')}, body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword, newName: newName }) });
+    const data = await res.json();
+    if (data.success) {
+      if (newName) localStorage.setItem('iys_name', newName);
+      alert(newName && newPassword ? 'Name and password updated!' : newName ? 'Name updated!' : 'Password changed!');
+      document.getElementById('change-password-modal').classList.add('hidden');
+      document.getElementById('cp-name').value=''; document.getElementById('cp-current').value=''; document.getElementById('cp-new').value=''; document.getElementById('cp-new-confirm').value='';
+      renderHeader();
+    }
+    else { errEl.innerText = data.error || 'Failed.'; }
+  } catch (e) { errEl.innerText = 'Network error.'; }
+}
+
+function linkify(text){
+  return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" class="content-link">$1</a>');
+}
+
+function renderCourse(){
+  const host = document.getElementById('course-content');
+  const linksHost = document.getElementById('module-links');
+  linksHost.innerHTML = '';
+
+  const lessonInfo = COURSE_DATA.lessonInfo;
+  const lessonTone = lessonInfo ? lessonInfo.tone : 1;
+  const lessonName = lessonInfo ? lessonInfo.name : currentLessonId;
+  const gradient = getGradient(lessonTone);
+
+  let html = '<div style="min-height:100vh;padding:40px 0; background:var(--cream)"><div class="wrap">';
+  html += '<div class="lesson-title-card"><h1>Lesson ' + lessonTone + ': ' + escapeHtml(lessonName) + '</h1></div>';
+  html += '<div id="lesson-modules"></div>';
+  html += '<div class="lesson-title-card" style="text-align:left;padding:24px 28px;">';
+  html += '<div class="module-check-container" style="background:transparent;padding:0;justify-content:flex-start;">';
+  html += '<input type="checkbox" id="lesson-check" onchange="triggerAutoSave()">';
+  html += '<label for="lesson-check" style="color:var(--navy);">Mark Lesson ' + lessonTone + ' as Complete</label></div>';
+  html += '<p id="lesson-hint" style="color:var(--slate);font-weight:700;font-size:.95rem;margin:10px 0 0;"></p>';
+  html += '</div></div></div>';
+  host.innerHTML = html;
+
+  const modulesHost = document.getElementById('lesson-modules');
+  const rows = COURSE_DATA;
+  const moduleNumbers = new Set();
+  const modules = {};
+
+  rows.forEach(function(row){
+    if (row.length < 4) return;
+    const modNum = row[1] ? parseInt(row[1].trim()) : 1;
+    if (modNum && modNum > 0) {
+      moduleNumbers.add(modNum);
+      if (!modules[modNum]) modules[modNum] = [];
+      modules[modNum].push(row);
+    }
+  });
+
+  const chev = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+  Array.from(moduleNumbers).sort(function(a,b){ return a-b; }).forEach(function(modNum){
+    const section = document.createElement('section');
+    section.id = 'mod-section-' + modNum;
+    section.className = 'module-section';
+    section.style.background = gradient;
+
+    const moduleItems = modules[modNum];
+    const modRow = moduleItems.find(function(r){ return (r[2] || '').trim().toLowerCase() === 'module'; });
+    const modTitle = modRow ? (modRow[3] || '').trim() : '';
+    const topicName = modTitle.replace(/^\s*(?:module|lesson)\s*\d+\s*(?:am|pm)?\s*:\s*/i, '') || modTitle || ('Module ' + modNum);
+
+    section.innerHTML =
+      '<div class="module-header"><h2>Module ' + modNum + '</h2></div>' +
+      '<div class="mod-items" id="items-mod-' + modNum + '"></div>' +
+      '<div class="module-check-container">' +
+        '<input type="checkbox" id="module-check-' + modNum + '" data-module="' + modNum + '" onchange="triggerAutoSave()">' +
+        '<label for="module-check-' + modNum + '">Mark Module ' + modNum + ' as Complete</label>' +
+      '</div>';
+
+    modulesHost.appendChild(section);
+    linksHost.innerHTML += '<a href="#mod-section-' + modNum + '">Module ' + modNum + '</a>';
+    const itemsHost = section.querySelector('.mod-items');
+
+    moduleItems.forEach(function(row){
+      const type = row[2] ? row[2].trim().toLowerCase() : 'text';
+      let title = row[3] || '';
+      const content = row[4] || '';
+      const extra1 = row[5] || '';
+      const extra2 = row[6] || '';
+      if (type === 'module') return;
+      if (type === 'text' && title.trim().toLowerCase() === 'topic description') title = topicName;
+
+      const id = (currentLessonId + '_' + title).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+      const div = document.createElement('div');
+      div.className = 'mod-item';
+      div.dataset.id = id;
+      div.dataset.header = title;
+      div.dataset.format = type;
+
+      if (type === 'expandable') {
+        const bullets = content.split(/\n|\|/).map(function(s){ return s.trim(); }).filter(Boolean);
+        const innerHtml = bullets.length
+          ? '<ul style="margin-left:20px; list-style:disc; margin-bottom:6px;">' + bullets.map(function(b){ return '<li style="margin-bottom:6px;">' + linkify(b) + '</li>'; }).join('') + '</ul>'
+          : (content ? '<div class="mod-content">' + linkify(content) + '</div>' : '');
+        const imgHtml = extra2 ? '<img src="' + escapeHtml(extra2) + '" alt="' + escapeHtml(title) + '" loading="lazy" style="max-width:100%;border-radius:8px;margin:12px 0;">' : '';
+        const nested = extra1 ? '<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>More information on ' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content"><div class="mod-content">' + extra1.split(/\n|\|/).map(function(p){ return '<p style="margin-bottom:10px;">' + linkify(p) + '</p>'; }).join('') + '</div></div></div>' : '';
+        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content">' + innerHtml + imgHtml + nested + '</div></div>';
+      } else if (type === 'answer') {
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><div class="answer-box"><label>' + linkify(content) + '</label><textarea class="answer-input" placeholder="' + escapeHtml(extra1) + '" oninput="triggerAutoSave()"></textarea></div>';
+      } else if (type === 'poll') {
+        const options = extra1 ? extra1.split('|') : [];
+        const inputType = extra2 === 'multi' ? 'checkbox' : 'radio';
+        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content"><div class="poll-box">' + options.map(function(opt){ return '<label class="poll-option"><input type="' + inputType + '" name="poll-' + id + '" value="' + escapeHtml(opt.trim()) + '" onchange="triggerAutoSave()"> ' + escapeHtml(opt.trim()) + '</label>'; }).join('') + '</div><div class="poll-chart" data-poll="' + id + '"></div></div></div>';
+      } else if (type === 'link') {
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><a href="' + escapeHtml(content) + '" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">' + escapeHtml(extra1 || 'Open Link') + '</a>';
+      } else if (type === 'image') {
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><div class="mod-content">' + linkify(content) + '</div><img src="' + escapeHtml(extra2) + '" style="max-width:100%; border-radius:8px; margin:12px 0;" alt="' + escapeHtml(title) + '"><p style="font-style:italic; color:var(--slate)">' + escapeHtml(extra1) + '</p>';
+      } else if (type === 'bullets' || type === 'bulllets') {
+        const items = content.split(/\n|\|/).map(function(line){ return '<li>' + linkify(line.trim()) + '</li>'; }).filter(function(l){ return l !== '<li></li>'; }).join('');
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><ul style="margin-left:20px; list-style:disc;">' + items + '</ul>';
+      } else if (type === 'numbers') {
+        const items = content.split(/\n|\|/).map(function(line){ return '<li>' + linkify(line.trim()) + '</li>'; }).filter(function(l){ return l !== '<li></li>'; }).join('');
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><ol style="margin-left:20px;">' + items + '</ol>';
+      } else if (type === 'title') {
+        div.innerHTML = '<h3 class="item-title" style="font-size:1.4rem">' + escapeHtml(title) + '</h3><div class="mod-content">' + linkify(content) + '</div>';
+      } else if (type === 'animation') {
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><div class="anim-host"></div>';
+      } else {
+        div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><div class="mod-content">' + linkify(content) + '</div>';
+      }
+      itemsHost.appendChild(div);
+      if (type === 'animation' && window.IYS_ANIM && window.IYS_ANIM.mount) window.IYS_ANIM.mount(div.querySelector('.anim-host'), content);
+    });
+  });
+
+  loadProgress();
+  updateLessonCheck();
+}
+
+function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); updateLessonCheck(); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
+function updateLessonCheck(){
+  const lessonCheck = document.getElementById('lesson-check');
+  const hint = document.getElementById('lesson-hint');
+  if (!lessonCheck) return;
+  const mods = Array.from(document.querySelectorAll('[id^="module-check-"]'));
+  const answers = Array.from(document.querySelectorAll('.mod-item[data-format="answer"] .answer-input'));
+  const modsLeft = mods.filter(function(m){ return !m.checked; }).length;
+  const answersLeft = answers.filter(function(a){ return !a.value.trim(); }).length;
+  const unlocked = modsLeft === 0 && answersLeft === 0;
+  lessonCheck.disabled = !unlocked && !lessonCheck.checked;
+  if (hint) {
+    if (lessonCheck.checked) hint.innerText = 'Lesson marked complete. Great work!';
+    else if (unlocked) hint.innerText = 'All requirements met — you can mark this lesson complete.';
+    else {
+      const parts = [];
+      if (modsLeft > 0) parts.push(modsLeft + ' module' + (modsLeft > 1 ? 's' : '') + ' to check');
+      if (answersLeft > 0) parts.push(answersLeft + ' answer box' + (answersLeft > 1 ? 'es' : '') + ' to fill');
+      hint.innerText = 'Unlock by finishing: ' + parts.join(' and ') + '.';
+    }
+  }
+}
+function setStatus(text, cls){ const el = document.getElementById('save-status'); el.innerText = text; el.className = 'save-status ' + (cls || ''); }
+
+async function saveProgress(){
+  setStatus('Saving…', 'save-warn');
+  const progress = [];
+  document.querySelectorAll('[id^="module-check-"]').forEach(function(check){
+    progress.push({
+      item_id: (currentLessonId + '_module_' + check.dataset.module).toLowerCase(),
+      header_name: 'M' + check.dataset.module,
+      format: 'module',
+      type: 'module_completion',
+      completed: check.checked ? 1 : 0,
+      note: ''
+    });
+  });
+  const lessonCheck = document.getElementById('lesson-check');
+  if (lessonCheck) {
+    progress.push({
+      item_id: (currentLessonId + '_lesson_complete').toLowerCase(),
+      header_name: 'Lesson',
+      format: 'lesson',
+      type: 'lesson_completion',
+      completed: lessonCheck.checked ? 1 : 0,
+      note: ''
+    });
+  }
+  document.querySelectorAll('.mod-item').forEach(function(item){
+    const format = item.dataset.format;
+    if (format === 'answer') {
+      const noteEl = item.querySelector('.answer-input');
+      progress.push({ item_id: item.dataset.id, header_name: item.dataset.header, format: 'answer', type: 'answer', completed: 0, note: noteEl ? noteEl.value : '' });
+    } else if (format === 'poll') {
+      const selected = Array.from(item.querySelectorAll('input:checked')).map(function(i){ return i.value; });
+      progress.push({ item_id: item.dataset.id, header_name: item.dataset.header, format: 'poll', type: 'poll', completed: 0, note: selected.join('|') });
+    }
+  });
+  try {
+    const res = await fetch('/api/progress', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      body: JSON.stringify({ lesson: currentLessonId, progress: progress })
+    });
+    if (res.ok) { setStatus('All changes saved.', ''); refreshMe(); updatePollCharts(); } else setStatus('Error saving!', 'save-warn');
+  } catch (e) { setStatus('Error saving!', 'save-warn'); }
+}
+
+async function loadProgress(){
+  try {
+    const res = await fetch('/api/progress', { headers:{'Authorization':'Bearer ' + localStorage.getItem('token')} });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    data.forEach(function(saved){
+      if (saved.type === 'module_completion') {
+        const prefix = (currentLessonId + '_module_').toLowerCase();
+        if (saved.item_id.startsWith(prefix)) {
+          const modNum = saved.item_id.replace(prefix, '');
+          const check = document.getElementById('module-check-' + modNum);
+          if (check) check.checked = saved.completed === 1;
+        }
+      }
+      const item = document.querySelector('.mod-item[data-id="' + saved.item_id + '"]');
+      if (item) {
+        if (saved.type === 'answer') {
+          const noteEl = item.querySelector('.answer-input');
+          if (noteEl) noteEl.value = saved.note || '';
+        } else if (saved.type === 'poll') {
+          const selected = (saved.note || '').split('|');
+          item.querySelectorAll('input').forEach(function(inp){ inp.checked = selected.includes(inp.value); });
+        }
+      }
+    });
+    const lessonSaved = data.find(function(s){ return s.type === 'lesson_completion' && s.item_id === (currentLessonId + '_lesson_complete').toLowerCase(); });
+    const lessonCheck = document.getElementById('lesson-check');
+    if (lessonCheck && lessonSaved) lessonCheck.checked = lessonSaved.completed === 1;
+    setStatus('All changes saved.', '');
+    updateLessonCheck();
+    updatePollCharts();
+  } catch (e) {
+    console.error('Error loading progress:', e);
+    updateLessonCheck();
+  }
+}
+
+async function parseCSV(text) {
+  const rows = []; let currentRow = []; let currentCell = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') inQuotes = !inQuotes;
+    else if (char === ',' && !inQuotes) { currentRow.push(currentCell); currentCell = ''; }
+    else if ((char === '\n' || char === '\r') && !inQuotes) { if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); } currentRow = []; currentCell = ''; if (char === '\r' && text[i+1] === '\n') i++; }
+    else currentCell += char;
+  }
+  if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell); rows.push(currentRow); }
+  return rows;
+}
+
+setInterval(function(){ const t = localStorage.getItem('token'); if (t) fetch('/api/heartbeat', { headers:{'Authorization':'Bearer ' + t} }).catch(function(){}); }, 60000);
+showHome();
+</script>
+</body>
+</html>
