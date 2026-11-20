@@ -1,7 +1,5 @@
 
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -88,8 +86,11 @@ h1,h2,h3,.brand{font-family:'Poppins',sans-serif}
 .score-pill{background:#fff;color:var(--navy);border:2px solid var(--pink);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .loc-pill{background:#fff;color:var(--navy);border:2px solid var(--lightBlue);border-radius:999px;padding:2px 10px;font-weight:800;font-size:.9rem;white-space:nowrap;}
 .module-section{margin-bottom:40px; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-.module-header{padding:40px 30px; text-align:center}
+.module-header{padding:40px 30px; text-align:center; position:relative}
 .module-header h2{font-size:clamp(1.8rem,4vw,2.5rem); font-weight:800; margin:0; color:#fff}
+.mod-expand-pill{position:absolute; right:26px; top:50%; transform:translateY(-50%); background:#fff; color:var(--navy); border:2px solid var(--navy); border-radius:999px; padding:7px 18px; font-weight:800; font-size:.9rem; font-family:'Nunito Sans',sans-serif; cursor:pointer; box-shadow:0 4px 10px rgba(2,62,138,.18); transition:transform .15s, background .15s, color .15s}
+.mod-expand-pill:hover{background:var(--lightBlue); transform:translateY(calc(-50% - 2px))}
+@media(max-width:600px){.mod-expand-pill{position:static; transform:none; margin-top:12px; display:inline-block} .mod-expand-pill:hover{transform:translateY(-2px)}}
 .mod-item{background:#fff; color:var(--navy); padding:24px 26px; margin:0; border-bottom:1px solid rgba(2,62,138,0.1)}
 .mod-item:last-child{border-bottom:none}
 .item-title{font-size:1.25rem;font-weight:800;margin:0 0 12px; color:var(--navy)}
@@ -822,7 +823,7 @@ function renderCourse(){
     const topicName = modTitle.replace(/^\s*(?:module|lesson)\s*\d+\s*(?:am|pm)?\s*:\s*/i, '') || modTitle || ('Module ' + modNum);
 
     section.innerHTML =
-      '<div class="module-header"><h2>Module ' + modNum + '</h2></div>' +
+      '<div class="module-header"><h2>Module ' + modNum + '</h2><button type="button" class="mod-expand-pill" onclick="toggleModuleExpand(' + modNum + ')">Expand</button></div>' +
       '<div class="mod-items" id="items-mod-' + modNum + '"></div>' +
       '<div class="module-check-container">' +
         '<input type="checkbox" id="module-check-' + modNum + '" data-module="' + modNum + '" onchange="triggerAutoSave()">' +
@@ -856,13 +857,13 @@ function renderCourse(){
           : (content ? '<div class="mod-content">' + linkify(content) + '</div>' : '');
         const imgHtml = extra2 ? '<img src="' + escapeHtml(extra2) + '" alt="' + escapeHtml(title) + '" loading="lazy" style="max-width:100%;border-radius:8px;margin:12px 0;">' : '';
         const nested = extra1 ? '<div class="expandable-box" style="margin-top:12px;"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>More information on ' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content"><div class="mod-content">' + extra1.split(/\n|\|/).map(function(p){ return '<p style="margin-bottom:10px;">' + linkify(p) + '</p>'; }).join('') + '</div></div></div>' : '';
-        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content">' + innerHtml + imgHtml + nested + '</div></div>';
+        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\');syncModulePill(' + modNum + ')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content">' + innerHtml + imgHtml + nested + '</div></div>';
       } else if (type === 'answer') {
         div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><div class="answer-box"><label>' + linkify(content) + '</label><textarea class="answer-input" placeholder="' + escapeHtml(extra1) + '" oninput="triggerAutoSave()"></textarea></div>';
       } else if (type === 'poll') {
         const options = extra1 ? extra1.split('|') : [];
         const inputType = extra2 === 'multi' ? 'checkbox' : 'radio';
-        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content"><div class="poll-box">' + options.map(function(opt){ return '<label class="poll-option"><input type="' + inputType + '" name="poll-' + id + '" value="' + escapeHtml(opt.trim()) + '" onchange="triggerAutoSave()"> ' + escapeHtml(opt.trim()) + '</label>'; }).join('') + '</div><div class="poll-chart" data-poll="' + id + '"></div></div></div>';
+        div.innerHTML = '<div class="expandable-box"><div class="expandable-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\');syncModulePill(' + modNum + ')"><span>' + escapeHtml(title) + '</span>' + chev + '</div><div class="expandable-content"><div class="poll-box">' + options.map(function(opt){ return '<label class="poll-option"><input type="' + inputType + '" name="poll-' + id + '" value="' + escapeHtml(opt.trim()) + '" onchange="triggerAutoSave()"> ' + escapeHtml(opt.trim()) + '</label>'; }).join('') + '</div><div class="poll-chart" data-poll="' + id + '"></div></div></div>';
       } else if (type === 'link') {
         div.innerHTML = '<h3 class="item-title">' + escapeHtml(title) + '</h3><a href="' + escapeHtml(content) + '" target="_blank" class="btn cta" style="display:inline-block; margin-top:10px; text-decoration:none;">' + escapeHtml(extra1 || 'Open Link') + '</a>';
       } else if (type === 'image') {
@@ -883,10 +884,47 @@ function renderCourse(){
       itemsHost.appendChild(div);
       if (type === 'animation' && window.IYS_ANIM && window.IYS_ANIM.mount) window.IYS_ANIM.mount(div.querySelector('.anim-host'), content);
     });
+
+    if (!section.querySelectorAll('.mod-item > .expandable-box').length) {
+      const btn = section.querySelector('.mod-expand-pill');
+      if (btn) btn.remove();
+    }
   });
 
   loadProgress();
   updateLessonCheck();
+}
+
+function getFirstLevelExpandables(modNum) {
+  const section = document.getElementById('mod-section-' + modNum);
+  if (!section) return [];
+  return Array.from(section.querySelectorAll('.mod-item > .expandable-box > .expandable-content'));
+}
+
+function syncModulePill(modNum) {
+  const section = document.getElementById('mod-section-' + modNum);
+  if (!section) return;
+  const pill = section.querySelector('.mod-expand-pill');
+  if (!pill) return;
+  const items = getFirstLevelExpandables(modNum);
+  const anyOpen = items.some(function(el){ return el.classList.contains('expanded'); });
+  pill.textContent = anyOpen ? 'Collapse' : 'Expand';
+}
+
+function toggleModuleExpand(modNum) {
+  const items = getFirstLevelExpandables(modNum);
+  const anyOpen = items.some(function(el){ return el.classList.contains('expanded'); });
+  items.forEach(function(el){
+    if (anyOpen) {
+      el.classList.remove('expanded');
+      el.querySelectorAll('.expandable-content.expanded').forEach(function(sub){
+        sub.classList.remove('expanded');
+      });
+    } else {
+      el.classList.add('expanded');
+    }
+  });
+  syncModulePill(modNum);
 }
 
 function triggerAutoSave(){ setStatus('Unsaved changes…', 'save-warn'); updateLessonCheck(); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveProgress, 1500); }
